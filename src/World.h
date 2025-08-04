@@ -5,10 +5,10 @@
 #include "structs.h"
 
 constexpr unsigned short int CHUNKSIZE = 16;
-constexpr unsigned short int CHUNKHEIGHT = 256;
+constexpr unsigned short int CHUNKHEIGHT = 64;
 
 enum BLOCKTYPE {
-	GRASS
+	AIR, GRASS, DIRT, STONE
 };
 enum BLOCKFACE {
 	FRONT, BACK, RIGHT, LEFT, TOP, BOTTOM
@@ -29,6 +29,12 @@ static uint8_t getBlockTextureIndex(BLOCKTYPE bType, BLOCKFACE bFace)
 		default:
 			return 1;
 		}
+		break;
+	case DIRT:
+		return 2;
+		break;
+	case STONE:
+		return 3;
 	default:
 		return 99;
 	}
@@ -44,6 +50,8 @@ public:
 
 	bool allocateChunkData();
 	uint8_t* getData();
+	bool isFaceVisible(glm::ivec3 blockPos, BLOCKFACE face);
+	int getBlockIndex(glm::ivec3 blockCoords);
 private:
 	uint8_t* pData;
 };

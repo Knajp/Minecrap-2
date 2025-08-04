@@ -175,6 +175,7 @@
     <ClInclude Include="src\GraphicsEngine.h" />
     <ClInclude Include="src\structs.h" />
     <ClInclude Include="src\World.h" />
+    <ClInclude Include="vendor\include\stb\stb_image.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="compile.bat" />
