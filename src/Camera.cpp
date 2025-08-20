@@ -48,14 +48,18 @@ void Camera::processInput(GLFWwindow* window)
 
 void Camera::modifyAspectRatio(float newAR)
 {
-	mMatrices.proj = glm::perspective(glm::radians(45.0f), newAR, 0.1f, 100.0f);
+	mMatrices.proj = glm::perspective(glm::radians(45.0f), newAR, 0.1f, 1000.0f);
+}
+
+glm::vec3 Camera::getPosition() const
+{
+	return mPosition;
 }
 
 Camera::Camera()
 	:mOrientation(glm::vec3(1.0f, 0.0f, 0.0f)), mPosition(glm::vec3(3.0f, -2.0f, -2.0f)), mUp(glm::vec3(0.0f, 1.0f, 0.0f))
 {
-	
-	mMatrices.model = glm::mat4(1.0f);
-	mMatrices.proj = glm::perspective(glm::radians(45.0f), 1.0f, 0.1f, 100.0f);
+
+	mMatrices.proj = glm::perspective(glm::radians(45.0f), 1.0f, 0.1f, 1000.0f);
 	mMatrices.view = glm::lookAt(mPosition, mPosition + mOrientation, mUp);
 }

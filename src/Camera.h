@@ -15,6 +15,7 @@ public:
 	void processInput(GLFWwindow* window);
 	void modifyAspectRatio(float newAR);
 
+	glm::vec3 getPosition() const;
 private:
 
 	glm::vec3 mOrientation;

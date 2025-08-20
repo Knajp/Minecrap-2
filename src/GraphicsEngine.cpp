@@ -1,3 +1,4 @@
+#define GLM_ENABLE_EXPERIMENTAL
 #include "GraphicsEngine.h"
 #include <assert.h>
 #include <set>
@@ -5,6 +6,7 @@
 #include <algorithm> 
 #include <fstream>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/string_cast.hpp>
 #include <chrono>
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -21,6 +23,7 @@ std::vector<const char*> g_EnabledExtensions = {
 std::vector<const char*> g_EnabledDeviceExtensions = {  
 	VK_KHR_SWAPCHAIN_EXTENSION_NAME
 };
+
 
 
 VkPhysicalDevice GraphicsEngine::m_PhysicalDevice = VK_NULL_HANDLE;
@@ -58,9 +61,9 @@ void GraphicsEngine::IntializeGraphicsEngine()
 	createUniformBuffers();
 	createDescriptorPool();
 	createDescriptorSets();
-	initChunk();
 	createCommandBuffer();
 	createSyncObjects();
+	mPlanet.InitDestructionList(m_Device);
 	mainLoop();
 	terminate();
 }
@@ -335,7 +338,6 @@ void GraphicsEngine::mainLoop()
 
 void GraphicsEngine::terminate()
 {
-	mChunk.destroyChunk();
 	vkFreeMemory(m_Device, colorImageMemory, nullptr);
 	vkDestroyImageView(m_Device, colorImageView, nullptr);
 	vkDestroyImage(m_Device, colorImage, nullptr);
@@ -549,10 +551,17 @@ void GraphicsEngine::createGraphicsPipeline()
 	colorState.pAttachments = &colorBlend;
 	colorState.logicOpEnable = VK_FALSE;
 
+	VkPushConstantRange pcRange{};
+	pcRange.offset = 0;
+	pcRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+	pcRange.size = sizeof(PushConstants);
+
 	VkPipelineLayoutCreateInfo layoutInfo{};
 	layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	layoutInfo.setLayoutCount = 1;
 	layoutInfo.pSetLayouts = &m_DescLayout;
+	layoutInfo.pushConstantRangeCount = 1;
+	layoutInfo.pPushConstantRanges = &pcRange;
 
 	if (vkCreatePipelineLayout(m_Device, &layoutInfo, nullptr, &m_PipelineLayout) != VK_SUCCESS)
 		throw std::runtime_error("Failed to create pipeline layout");
@@ -584,11 +593,6 @@ void GraphicsEngine::createGraphicsPipeline()
 void GraphicsEngine::setFramebufferResized(bool resized)
 {
 	framebufferResized = resized;
-}
-
-void GraphicsEngine::initChunk()
-{
-	mChunk.generateMesh();
 }
 
 void GraphicsEngine::createColorResources()
@@ -942,6 +946,7 @@ void GraphicsEngine::updateUniformBuffer(uint32_t currentImage)
 {	
 	MVP ubo = mCamera.getMatrices();
 
+
 	memcpy(m_UniformBuffersMapped[currentImage], &ubo, sizeof(MVP));
 }
 
@@ -1146,6 +1151,7 @@ void GraphicsEngine::createSyncObjects()
 void GraphicsEngine::drawFrame()
 {
 	vkWaitForFences(m_Device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
+	
 
 	uint32_t imageIndex;
 	VkResult result = vkAcquireNextImageKHR(m_Device, m_Swapchain, UINT64_MAX, imageReadySemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
@@ -1158,6 +1164,8 @@ void GraphicsEngine::drawFrame()
 	else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
 		throw std::runtime_error("Failed to acquire next image index!");
 
+	mPlanet.Cleanup(currentFrame, m_Device);
+
 	vkResetFences(m_Device, 1, &inFlightFences[currentFrame]);
 
 	vkResetCommandBuffer(m_CommandBuffers[currentFrame], 0);
@@ -1165,13 +1173,14 @@ void GraphicsEngine::drawFrame()
 	mCamera.processInput(m_Window);
 	updateUniformBuffer(currentFrame);
 
+	mPlanet.Update({ mCamera.getPosition().x, mCamera.getPosition().z }, currentFrame);
 	recordCommandBuffer(m_CommandBuffers[currentFrame], imageIndex);
-
+	
 	VkSubmitInfo submitInfo{};
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 	submitInfo.commandBufferCount = 1;
 	submitInfo.pCommandBuffers = &m_CommandBuffers[currentFrame];
-
+	
 	VkSemaphore waitSemaphores[] = { imageReadySemaphores[currentFrame] };
 	VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
 	VkSemaphore signalSemaphores[] = { renderFinishedSemaphores[currentFrame] };
@@ -1229,15 +1238,13 @@ void GraphicsEngine::recordCommandBuffer(VkCommandBuffer buffer, uint32_t imageI
 	
 	vkCmdBeginRenderPass(buffer, &renderInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-	vkCmdBindPipeline(buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_Pipeline);
-
-	
+	vkCmdBindPipeline(buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_Pipeline);	
 
 	VkViewport viewport{};
 	viewport.height = static_cast<float>(m_SwapchainExtent.height);
 	viewport.width = static_cast<float>(m_SwapchainExtent.width);
 	viewport.maxDepth = 1.0f;
-	viewport.minDepth = 0.0f;
+	viewport.minDepth = 0.0f;										
 	viewport.x = 0.0f;
 	viewport.y = 0.0f;
 
@@ -1250,7 +1257,7 @@ void GraphicsEngine::recordCommandBuffer(VkCommandBuffer buffer, uint32_t imageI
 
 	vkCmdBindDescriptorSets(buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_PipelineLayout, 0, 1, &m_DescriptorSets[currentFrame], 0, nullptr);
 
-	mChunk.Render(buffer);
+	mPlanet.Render(buffer, m_PipelineLayout);
 	
 	vkCmdEndRenderPass(buffer);
 

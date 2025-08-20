@@ -16,7 +16,7 @@
 #include "structs.h"
 #include "Camera.h"
 
-constexpr uint8_t MAX_FRAMES_IN_FLIGHT = 3;
+
 const std::string texturePath = "src/txt/atlas.png";
 struct QueueFamilyIndices
 {
@@ -59,7 +59,6 @@ public:
 private:
 	GraphicsEngine() = default;
 	
-	void initChunk();
 	void createColorResources();
 	VkSampleCountFlagBits getMaxSampleCount();
 	bool hasStencilComponent(VkFormat format);
@@ -169,7 +168,7 @@ private:
 	VkDeviceMemory colorImageMemory;
 	VkImageView colorImageView;
 
-	Chunk mChunk = Chunk({ 0,0 });
+	Planet mPlanet;
 
 	Camera mCamera;
 };
