@@ -270,13 +270,18 @@ Planet::Planet()
 
 }
 
-void Planet::InitDestructionList(VkDevice& pDevice)
+void Planet::prepareForDestruction()
 {
-    for (auto& list : mAwaitngDestruction)
+    for (auto it = mChunks.begin(); it != mChunks.end();)
     {
-        list.Init(pDevice);
+
+        mAwaitngDestruction[2].chunkList.push_back(&it->second);
+        it->second.setPendingDeletionStatus(true);
+
+        ++it;
     }
 }
+
 
 void Planet::Update(glm::vec2 playerPosition, uint32_t currentFrame)
 {
@@ -298,7 +303,7 @@ void Planet::Update(glm::vec2 playerPosition, uint32_t currentFrame)
 
 void Planet::onPlayerCrossedChunk(glm::ivec2 plrChunk, uint32_t currentFrame)
 {
-    double maxDistanceFromPlayer = renderDistance * sqrt(2.0);
+    double maxDistanceFromPlayer = renderDistance * 1.42;
 
     for (auto it = mChunks.begin(); it != mChunks.end();)
     {

@@ -63,7 +63,6 @@ void GraphicsEngine::IntializeGraphicsEngine()
 	createDescriptorSets();
 	createCommandBuffer();
 	createSyncObjects();
-	mPlanet.InitDestructionList(m_Device);
 	mainLoop();
 	terminate();
 }
@@ -338,6 +337,8 @@ void GraphicsEngine::mainLoop()
 
 void GraphicsEngine::terminate()
 {
+	mPlanet.prepareForDestruction();
+	mPlanet.Cleanup(2, m_Device);
 	vkFreeMemory(m_Device, colorImageMemory, nullptr);
 	vkDestroyImageView(m_Device, colorImageView, nullptr);
 	vkDestroyImage(m_Device, colorImage, nullptr);

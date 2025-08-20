@@ -110,15 +110,6 @@ private:
 struct ChunkFreeList
 {
 	ChunkFreeList() = default;
-	void Init(VkDevice& pDevice)
-	{
-		VkFenceCreateInfo fenceCreateInfo{};
-		fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-
-		if (vkCreateFence(pDevice, &fenceCreateInfo, nullptr, &fence) != VK_SUCCESS)
-			throw std::runtime_error("Failed to create ChunkFreeList fence!");
-	}
-	VkFence fence;
 	std::vector<Chunk*> chunkList;
 };
 
@@ -129,7 +120,7 @@ public:
 	Planet(Planet&) = delete;
 	Planet& operator=(Planet&) = delete;
 
-	void InitDestructionList(VkDevice& pDevice);
+	void prepareForDestruction(); // very funny name
 	void Update(glm::vec2 playerPosition, uint32_t currentFrame);
 	void onPlayerCrossedChunk(glm::ivec2 plrChunk, uint32_t currentFrame);
 	void Render(VkCommandBuffer commandBuffer, VkPipelineLayout& layout);
@@ -139,7 +130,3 @@ private:
 	std::array<ChunkFreeList, MAX_FRAMES_IN_FLIGHT> mAwaitngDestruction;
 	const uint8_t renderDistance = 3;
 };
-
-/*
-	TODO: add a pendingDestruction flag for chunks to cut them out of renders for other FramesInFlight. Never render a chunk with that flag signalled.
-*/
