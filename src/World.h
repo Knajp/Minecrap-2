@@ -12,7 +12,7 @@ constexpr unsigned short int CHUNKHEIGHT = 64;
 constexpr uint8_t MAX_FRAMES_IN_FLIGHT = 3;
 
 enum BLOCKTYPE {
-	AIR, GRASS, DIRT, STONE
+	AIR, GRASS, DIRT, STONE, WOOD, LEAVES
 };
 enum BLOCKFACE {
 	FRONT, BACK, RIGHT, LEFT, TOP, BOTTOM
@@ -28,6 +28,7 @@ namespace std {
 		}
 	};
 }
+
 
 
 static uint8_t getBlockTextureIndex(BLOCKTYPE bType, BLOCKFACE bFace)
@@ -50,6 +51,18 @@ static uint8_t getBlockTextureIndex(BLOCKTYPE bType, BLOCKFACE bFace)
 		break;
 	case STONE:
 		return 3;
+	case WOOD:
+		switch (bFace)
+		{
+		case TOP:
+			return 4;
+		case BOTTOM:
+			return 4;
+		default:
+			return 5;
+		}
+	case LEAVES:
+		return 6;
 	default:
 		return 99;
 	}
@@ -68,6 +81,10 @@ public:
 	uint8_t* getData();
 	bool isFaceVisible(glm::ivec3 blockPos, BLOCKFACE face);
 	int getBlockIndex(glm::ivec3 blockCoords);
+	void generateTrees(glm::ivec2 chunkCoords);
+	void placeTree(glm::ivec3 baseCoords);
+	int getTopBlock(glm::ivec2 coords);
+	bool canPlaceTree(const std::vector<glm::ivec2>& treeVector, glm::ivec2 coords);
 private:
 	uint8_t* pData;
 };
@@ -95,6 +112,9 @@ public:
 private:
 	std::vector<Vertex> mMeshVertices;
 	std::vector<uint16_t> mMeshIndices;
+	std::vector<Vertex> mTransparentMeshVertices;
+	std::vector<uint16_t> mTransparentMeshIndices;
+
 	glm::ivec2 mWorldPosition;
 	ChunkData mData;
 
@@ -103,6 +123,12 @@ private:
 	
 	VkBuffer mIndexBuffer;
 	VkDeviceMemory mIndexBufferMemory;
+
+	VkBuffer mTransparentVertexBuffer;
+	VkDeviceMemory mTransparentVertexBuffferMemory;
+
+	VkBuffer mTransparentIndexBuffer;
+	VkDeviceMemory mTransparentIndexBufferMemory;
 
 	bool pendingDeletion = false;
 };
@@ -128,5 +154,5 @@ public:
 private:
 	std::unordered_map<glm::ivec2, Chunk> mChunks; 
 	std::array<ChunkFreeList, MAX_FRAMES_IN_FLIGHT> mAwaitngDestruction;
-	const uint8_t renderDistance = 3;
+	const uint8_t renderDistance = 2;
 };

@@ -3,6 +3,7 @@
 #include <array>
 #include <glm/glm.hpp>
 #include "PerlinNoise.hpp"
+#include <random>
 
 
 Chunk::Chunk(glm::ivec2 aWorldPos)
@@ -25,7 +26,10 @@ void Chunk::generateMesh()
         0,1,2, 2,3,0
     };
 
-    int forwardIndices = 0;
+
+    int forwardIndicesFull = 0, forwardIndicesTransparent = 0;
+    std::vector<Vertex>* targetVertexVector;
+    std::vector<uint16_t>* targetIndexVector;
 
     for(int x = 0; x < CHUNKSIZE; x++)
         for (int y = 0; y < CHUNKHEIGHT; y++)
@@ -44,81 +48,97 @@ void Chunk::generateMesh()
             uint8_t topTexture = getBlockTextureIndex(bType, BLOCKFACE::TOP);
             uint8_t bottomTexture = getBlockTextureIndex(bType, BLOCKFACE::BOTTOM);
 
+            int& forwardIndices = (bType == LEAVES) ? forwardIndicesTransparent : forwardIndicesFull;
+
+            targetVertexVector = &mMeshVertices;
+            targetIndexVector = &mMeshIndices;
             
+            if (bType == LEAVES)
+            {
+                targetVertexVector = &mTransparentMeshVertices;
+                targetIndexVector = &mTransparentMeshIndices;
+            }
 
             if (mData.isFaceVisible({ x, y, z }, FRONT))
             {
-                mMeshVertices.push_back(Vertex{ glm::vec3(x, y + 1.0f, z), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((frontTexture % 10) * 0.1f, (frontTexture / 10) * 0.1f + 0.1f) });
-                mMeshVertices.push_back(Vertex{ glm::vec3(x, y, z), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((frontTexture % 10) * 0.1f, (frontTexture / 10) * 0.1f) });
-                mMeshVertices.push_back(Vertex{ glm::vec3(x + 1.0f,  y, z), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((frontTexture % 10) * 0.1f + 0.1f, (frontTexture / 10) * 0.1f) });
-                mMeshVertices.push_back(Vertex{ glm::vec3(x + 1.0f,  y + 1.0f, z), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((frontTexture % 10) * 0.1f + 0.1f, (frontTexture / 10) * 0.1f + 0.1f) });
+                targetVertexVector->push_back(Vertex{ glm::vec3(x, y + 1.0f, z), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((frontTexture % 10) * 0.1f, (frontTexture / 10) * 0.1f + 0.1f) });
+                targetVertexVector->push_back(Vertex{ glm::vec3(x, y, z), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((frontTexture % 10) * 0.1f, (frontTexture / 10) * 0.1f) });
+                targetVertexVector->push_back(Vertex{ glm::vec3(x + 1.0f,  y, z), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((frontTexture % 10) * 0.1f + 0.1f, (frontTexture / 10) * 0.1f) });
+                targetVertexVector->push_back(Vertex{ glm::vec3(x + 1.0f,  y + 1.0f, z), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((frontTexture % 10) * 0.1f + 0.1f, (frontTexture / 10) * 0.1f + 0.1f) });
 
                 for (const uint16_t& index : Indices)
-                    mMeshIndices.push_back(index + forwardIndices);
+                    targetIndexVector->push_back(index + forwardIndices);
                 forwardIndices += 4;
             }
 
             if (mData.isFaceVisible({ x,y,z }, BACK))
             {
-                mMeshVertices.push_back(Vertex{ glm::vec3(x + 1.0f,  y + 1.0f, z + 1.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((backTexture % 10) * 0.1f,        (backTexture / 10) * 0.1f + 0.1f) });
-                mMeshVertices.push_back(Vertex{ glm::vec3(x + 1.0f,  y,        z + 1.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((backTexture % 10) * 0.1f,        (backTexture / 10) * 0.1f) });
-                mMeshVertices.push_back(Vertex{ glm::vec3(x,         y,        z + 1.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((backTexture % 10) * 0.1f + 0.1f, (backTexture / 10) * 0.1f) });
-                mMeshVertices.push_back(Vertex{ glm::vec3(x,         y + 1.0f, z + 1.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((backTexture % 10) * 0.1f + 0.1f,        (backTexture / 10) * 0.1f + 0.1f) });
+                targetVertexVector->push_back(Vertex{ glm::vec3(x + 1.0f,  y + 1.0f, z + 1.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((backTexture % 10) * 0.1f,        (backTexture / 10) * 0.1f + 0.1f) });
+                targetVertexVector->push_back(Vertex{ glm::vec3(x + 1.0f,  y,        z + 1.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((backTexture % 10) * 0.1f,        (backTexture / 10) * 0.1f) });
+                targetVertexVector->push_back(Vertex{ glm::vec3(x,         y,        z + 1.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((backTexture % 10) * 0.1f + 0.1f, (backTexture / 10) * 0.1f) });
+                targetVertexVector->push_back(Vertex{ glm::vec3(x,         y + 1.0f, z + 1.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((backTexture % 10) * 0.1f + 0.1f,        (backTexture / 10) * 0.1f + 0.1f) });
 
                 for (const uint16_t& index : Indices)
-                    mMeshIndices.push_back(index + forwardIndices);
+                    targetIndexVector->push_back(index + forwardIndices);
                 forwardIndices += 4;
             }
 
             if (mData.isFaceVisible({ x,y,z }, LEFT))
             {
-                mMeshVertices.push_back(Vertex{ glm::vec3(x,  y,        z + 1.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec2((leftTexture % 10) * 0.1f,        (leftTexture / 10) * 0.1f) });
-                mMeshVertices.push_back(Vertex{ glm::vec3(x,  y,        z),        glm::vec3(1.0f, 0.0f, 0.0f), glm::vec2((leftTexture % 10) * 0.1f + 0.1f, (leftTexture / 10) * 0.1f) });
-                mMeshVertices.push_back(Vertex{ glm::vec3(x,  y + 1.0f, z),        glm::vec3(1.0f, 0.0f, 0.0f), glm::vec2((leftTexture % 10) * 0.1f + 0.1f, (leftTexture / 10) * 0.1f + 0.1f) });
-                mMeshVertices.push_back(Vertex{ glm::vec3(x,  y + 1.0f, z + 1.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec2((leftTexture % 10) * 0.1f,        (leftTexture / 10) * 0.1f + 0.1f) });
+                targetVertexVector->push_back(Vertex{ glm::vec3(x,  y,        z + 1.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec2((leftTexture % 10) * 0.1f,        (leftTexture / 10) * 0.1f) });
+                targetVertexVector->push_back(Vertex{ glm::vec3(x,  y,        z),        glm::vec3(1.0f, 0.0f, 0.0f), glm::vec2((leftTexture % 10) * 0.1f + 0.1f, (leftTexture / 10) * 0.1f) });
+                targetVertexVector->push_back(Vertex{ glm::vec3(x,  y + 1.0f, z),        glm::vec3(1.0f, 0.0f, 0.0f), glm::vec2((leftTexture % 10) * 0.1f + 0.1f, (leftTexture / 10) * 0.1f + 0.1f) });
+                targetVertexVector->push_back(Vertex{ glm::vec3(x,  y + 1.0f, z + 1.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec2((leftTexture % 10) * 0.1f,        (leftTexture / 10) * 0.1f + 0.1f) });
 
                 for (const uint16_t& index : Indices)
-                    mMeshIndices.push_back(index + forwardIndices);
+                    targetIndexVector->push_back(index + forwardIndices);
                 forwardIndices += 4;
             }
 
             if (mData.isFaceVisible({ x,y,z }, RIGHT))
             {
-                mMeshVertices.push_back(Vertex{ glm::vec3(x + 1.0f,  y,        z + 1.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((rightTexture % 10) * 0.1f,        (rightTexture / 10) * 0.1f) });
-                mMeshVertices.push_back(Vertex{ glm::vec3(x + 1.0f,  y,        z),        glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((rightTexture % 10) * 0.1f + 0.1f,        (rightTexture / 10) * 0.1f) });
-                mMeshVertices.push_back(Vertex{ glm::vec3(x + 1.0f,  y + 1.0f, z),        glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((rightTexture % 10) * 0.1f + 0.1f, (rightTexture / 10) * 0.1f + 0.1f) });
-                mMeshVertices.push_back(Vertex{ glm::vec3(x + 1.0f,  y + 1.0f, z + 1.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((rightTexture % 10) * 0.1f, (rightTexture / 10) * 0.1f + 0.1f) });
+                targetVertexVector->push_back(Vertex{ glm::vec3(x + 1.0f,  y,        z + 1.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((rightTexture % 10) * 0.1f,        (rightTexture / 10) * 0.1f) });
+                targetVertexVector->push_back(Vertex{ glm::vec3(x + 1.0f,  y,        z),        glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((rightTexture % 10) * 0.1f + 0.1f,        (rightTexture / 10) * 0.1f) });
+                targetVertexVector->push_back(Vertex{ glm::vec3(x + 1.0f,  y + 1.0f, z),        glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((rightTexture % 10) * 0.1f + 0.1f, (rightTexture / 10) * 0.1f + 0.1f) });
+                targetVertexVector->push_back(Vertex{ glm::vec3(x + 1.0f,  y + 1.0f, z + 1.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((rightTexture % 10) * 0.1f, (rightTexture / 10) * 0.1f + 0.1f) });
 
                 for (const uint16_t& index : Indices)
-                    mMeshIndices.push_back(index + forwardIndices);
+                    targetIndexVector->push_back(index + forwardIndices);
                 forwardIndices += 4;
             }
 
             if (mData.isFaceVisible({ x,y,z }, TOP))
             {
-                mMeshVertices.push_back(Vertex{ glm::vec3(x,        y, z),        glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((topTexture % 10) * 0.1f,        (topTexture / 10) * 0.1f + 0.1f) });
-                mMeshVertices.push_back(Vertex{ glm::vec3(x,        y, z + 1.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((topTexture % 10) * 0.1f,        (topTexture / 10) * 0.1f) });
-                mMeshVertices.push_back(Vertex{ glm::vec3(x + 1.0f, y, z + 1.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((topTexture % 10) * 0.1f + 0.1f, (topTexture / 10) * 0.1f) });
-                mMeshVertices.push_back(Vertex{ glm::vec3(x + 1.0f, y, z),        glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((topTexture % 10) * 0.1f + 0.1f,        (topTexture / 10) * 0.1f + 0.1f) });
+                targetVertexVector->push_back(Vertex{ glm::vec3(x,        y, z),        glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((topTexture % 10) * 0.1f,        (topTexture / 10) * 0.1f + 0.1f) });
+                targetVertexVector->push_back(Vertex{ glm::vec3(x,        y, z + 1.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((topTexture % 10) * 0.1f,        (topTexture / 10) * 0.1f) });
+                targetVertexVector->push_back(Vertex{ glm::vec3(x + 1.0f, y, z + 1.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((topTexture % 10) * 0.1f + 0.1f, (topTexture / 10) * 0.1f) });
+                targetVertexVector->push_back(Vertex{ glm::vec3(x + 1.0f, y, z),        glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((topTexture % 10) * 0.1f + 0.1f,        (topTexture / 10) * 0.1f + 0.1f) });
 
                 for (const uint16_t& index : Indices)
-                    mMeshIndices.push_back(index + forwardIndices);
+                    targetIndexVector->push_back(index + forwardIndices);
                 forwardIndices += 4;
             }
             if (mData.isFaceVisible({ x,y,z }, BOTTOM))
             {
-                mMeshVertices.push_back(Vertex{ glm::vec3(x,        y + 1.0f, z),         glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((bottomTexture % 10) * 0.1f,        (bottomTexture / 10) * 0.1f + 0.1f) });
-                mMeshVertices.push_back(Vertex{ glm::vec3(x,        y + 1.0f, z + 1.0f),  glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((bottomTexture % 10) * 0.1f,        (bottomTexture / 10) * 0.1f) });
-                mMeshVertices.push_back(Vertex{ glm::vec3(x + 1.0f, y + 1.0f, z + 1.0f),  glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((bottomTexture % 10) * 0.1f + 0.1f, (bottomTexture / 10) * 0.1f) });
-                mMeshVertices.push_back(Vertex{ glm::vec3(x + 1.0f, y + 1.0f, z),         glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((bottomTexture % 10) * 0.1f + 0.1f,        (bottomTexture / 10) * 0.1f + 0.1f) });
+                targetVertexVector->push_back(Vertex{ glm::vec3(x,        y + 1.0f, z),         glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((bottomTexture % 10) * 0.1f,        (bottomTexture / 10) * 0.1f + 0.1f) });
+                targetVertexVector->push_back(Vertex{ glm::vec3(x,        y + 1.0f, z + 1.0f),  glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((bottomTexture % 10) * 0.1f,        (bottomTexture / 10) * 0.1f) });
+                targetVertexVector->push_back(Vertex{ glm::vec3(x + 1.0f, y + 1.0f, z + 1.0f),  glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((bottomTexture % 10) * 0.1f + 0.1f, (bottomTexture / 10) * 0.1f) });
+                targetVertexVector->push_back(Vertex{ glm::vec3(x + 1.0f, y + 1.0f, z),         glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((bottomTexture % 10) * 0.1f + 0.1f,        (bottomTexture / 10) * 0.1f + 0.1f) });
 
                 for (const uint16_t& index : Indices)
-                    mMeshIndices.push_back(index + forwardIndices);
+                    targetIndexVector->push_back(index + forwardIndices);
                 forwardIndices += 4;
             }
         }
     GraphicsEngine::createVertexBuffer(mMeshVertices, mVertexBuffer, mVertexBufferMemory);
     GraphicsEngine::createIndexBuffer(mMeshIndices, mIndexBuffer, mIndexBufferMemory);
+
+    if (!mTransparentMeshVertices.empty())
+    {
+        GraphicsEngine::createVertexBuffer(mTransparentMeshVertices, mTransparentVertexBuffer, mTransparentVertexBuffferMemory);
+        GraphicsEngine::createIndexBuffer(mTransparentMeshIndices, mTransparentIndexBuffer, mTransparentIndexBufferMemory);
+    }
+    
 
     //mMeshVertices.clear();
     //mMeshIndices.clear();
@@ -128,11 +148,23 @@ void Chunk::generateMesh()
 void Chunk::Render(VkCommandBuffer commandBuffer) const
 {
     VkBuffer vertexBuffers[] = { mVertexBuffer };
+    VkBuffer transparentVertexBuffers[] = { mTransparentVertexBuffer };
     VkDeviceSize offsets[] = { 0 };
+
+
     vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
     vkCmdBindIndexBuffer(commandBuffer, mIndexBuffer, 0, VK_INDEX_TYPE_UINT16);
 
     vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(mMeshIndices.size()), 1, 0, 0, 0);
+
+    if (!mTransparentMeshVertices.empty())
+    {
+        vkCmdBindVertexBuffers(commandBuffer, 0, 1, transparentVertexBuffers, offsets);
+        vkCmdBindIndexBuffer(commandBuffer, mTransparentIndexBuffer, 0, VK_INDEX_TYPE_UINT16);
+
+        vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(mTransparentMeshIndices.size()), 1, 0, 0, 0);
+    }
+    
 }
 
 glm::ivec2 Chunk::getPosition() const
@@ -143,7 +175,14 @@ glm::ivec2 Chunk::getPosition() const
 void Chunk::destroyChunk() const
 {
     VkDevice device = GraphicsEngine::getDevice();
-
+    if (!mTransparentMeshVertices.empty())
+    {
+        vkDestroyBuffer(device, mTransparentVertexBuffer, nullptr);
+        vkFreeMemory(device, mTransparentVertexBuffferMemory, nullptr);
+        vkDestroyBuffer(device, mTransparentIndexBuffer, nullptr);
+        vkFreeMemory(device, mTransparentIndexBufferMemory, nullptr);
+    }
+    
     vkDestroyBuffer(device, mIndexBuffer, nullptr);
     vkFreeMemory(device, mIndexBufferMemory, nullptr);
     vkDestroyBuffer(device, mVertexBuffer, nullptr);
@@ -177,7 +216,7 @@ bool ChunkData::allocateChunkData(glm::ivec2 chunkCoords)
 {
     static double scale = 0.01;
     static int octaves = 6;
-    static double persistance = 0.5;
+    static double persistance = 0.48;
 
     
     static siv::BasicPerlinNoise<float> noise(static_cast<uint32_t>(glfwGetTime() * 1000));
@@ -205,7 +244,7 @@ bool ChunkData::allocateChunkData(glm::ivec2 chunkCoords)
                     pData[x * CHUNKHEIGHT * CHUNKSIZE + y * CHUNKSIZE + z] = BLOCKTYPE::STONE;
             }
             
-
+    generateTrees(chunkCoords);
     return true;
 }
 
@@ -252,7 +291,7 @@ bool ChunkData::isFaceVisible(glm::ivec3 blockPos, BLOCKFACE face)
 
     assert(pData);
 
-    if (pData[idx] == AIR) return true;
+    if (pData[idx] == AIR || (pData[idx] == LEAVES && pData[getBlockIndex(blockPos)] != LEAVES)) return true;
 
 
     return false;
@@ -265,9 +304,85 @@ int ChunkData::getBlockIndex(glm::ivec3 blockCoords)
     return blockCoords.x * CHUNKHEIGHT * CHUNKSIZE + blockCoords.y * CHUNKSIZE + blockCoords.z;
 }
 
+void ChunkData::generateTrees(glm::ivec2 chunkCoords)
+{
+    static uint8_t minDistance = 4;
+
+    static double scale = 0.3;
+    static int octaves = 6;
+    static double persistance = 0.6;
+
+    static siv::BasicPerlinNoise<float> treeNoise(rand());
+
+    std::vector<glm::ivec2> placedTrees = {};
+
+    double globalX, globalZ;
+    for (int x = 0; x < CHUNKSIZE; x++)
+    {
+        globalX = (int64_t)chunkCoords.x * CHUNKSIZE + x;
+        globalX *= scale;
+        for (int z = 0; z < CHUNKSIZE; z++)
+        {
+            globalZ = (int64_t)chunkCoords.y * CHUNKSIZE + z;
+            globalZ *= scale;
+
+            float noise = treeNoise.normalizedOctave2D_01(globalX, globalZ, octaves, persistance);
+
+            if (noise > 0.65f && canPlaceTree(placedTrees, { x,z }))
+            { 
+                placedTrees.push_back({ x,z });
+                placeTree({ x, getTopBlock({x,z}) , z });
+            }
+        }
+    }
+}
+
+void ChunkData::placeTree(glm::ivec3 baseCoords)
+{
+    for (int y = 3; y <= 6; y++)
+        for(int x = -2; x <= 2; x++)
+            for (int z = -2; z <= 2; z++)
+            {
+                if (y == 6 && abs(x) + abs(z) == 1)
+                    pData[getBlockIndex({ baseCoords.x + x, baseCoords.y - y, baseCoords.z + z})] = LEAVES;
+                else if(y == 5 && abs(x) < 2 && abs(z) < 2)
+                    pData[getBlockIndex({ baseCoords.x + x, baseCoords.y - y, baseCoords.z + z })] = LEAVES;
+                else if(y == 4 && abs(x) + abs(z) != 4)
+                   pData[getBlockIndex({ baseCoords.x + x, baseCoords.y - y, baseCoords.z + z })] = LEAVES;
+                else if(y ==3)
+                    pData[getBlockIndex({ baseCoords.x + x, baseCoords.y - y, baseCoords.z + z })] = LEAVES;
+
+            }
+                
+    pData[getBlockIndex({ baseCoords.x, baseCoords.y - 7, baseCoords.z })] = LEAVES;
+    for (int y = 1; y <= 6; y++)
+        pData[getBlockIndex({ baseCoords.x, baseCoords.y - y, baseCoords.z })] = WOOD;
+
+
+}
+
+int ChunkData::getTopBlock(glm::ivec2 coords)
+{
+    for (int i = 0; i < 256; i++)
+    {
+        if (pData[getBlockIndex({ coords.x, i, coords.y })] != AIR) return i;
+    }
+}
+
+bool ChunkData::canPlaceTree(const std::vector<glm::ivec2>& treeVector, glm::ivec2 coords)
+{
+    for (const auto& tree : treeVector)
+    {
+        glm::ivec2 deltaVector = coords - tree;
+
+        if (deltaVector.x + deltaVector.y < 4) return false;
+    }
+    return true;
+}
+
 Planet::Planet()
 {
-
+    srand(static_cast<uint32_t>(glfwGetTime()));
 }
 
 void Planet::prepareForDestruction()
