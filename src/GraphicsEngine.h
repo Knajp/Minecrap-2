@@ -59,6 +59,7 @@ public:
 private:
 	GraphicsEngine() = default;
 	
+	int rateDeviceSuitability(const VkPhysicalDevice& device);
 	void createColorResources();
 	VkSampleCountFlagBits getMaxSampleCount();
 	bool hasStencilComponent(VkFormat format);

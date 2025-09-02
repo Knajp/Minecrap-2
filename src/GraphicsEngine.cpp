@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <set>
 #include <array>
+#include <map>
 #include <algorithm> 
 #include <fstream>
 #include <glm/gtc/matrix_transform.hpp>
@@ -233,34 +234,38 @@ void GraphicsEngine::pickPhysicalDevice()
 	std::vector<VkPhysicalDevice> devices(deviceCount);
 	vkEnumeratePhysicalDevices(m_Instance, &deviceCount, devices.data());
 
+	std::multimap<int, VkPhysicalDevice> candidates{};
 	for (const VkPhysicalDevice& device : devices)
 	{
-		VkPhysicalDeviceProperties properties{};
-		vkGetPhysicalDeviceProperties(device, &properties);
-
-		VkPhysicalDeviceFeatures supportedFeatures{};
-		vkGetPhysicalDeviceFeatures(device, &supportedFeatures);
-
-		bool extensionsSupported = checkDeviceExtensionSupport(device);
-
-		bool swapchainAdequate = false;
-		if (extensionsSupported)
-		{
-			SwapchainSupportDetails supportDetails = querySwapchainSupport(device);
-			if (!supportDetails.formats.empty() && !supportDetails.presentModes.empty())
-				swapchainAdequate = true;
-		}
-		else continue;
-
-		if (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU && supportedFeatures.geometryShader && checkDeviceExtensionSupport(device) && supportedFeatures.samplerAnisotropy)
-		{
-			m_PhysicalDevice = device;
-			msaaSamples = getMaxSampleCount();
-			return;
-		}
-		
+		candidates.insert(std::make_pair(rateDeviceSuitability(device), device));
 	}
-	throw std::runtime_error("Failed to find a suitable GPU!");
+
+	if (candidates.rbegin()->first > 0)
+	{
+		m_PhysicalDevice = candidates.rbegin()->second;
+		msaaSamples = getMaxSampleCount();
+	}
+	else throw std::runtime_error("Failed to find a suitable GPU!");
+}
+
+int GraphicsEngine::rateDeviceSuitability(const VkPhysicalDevice& device)
+{
+	int score = 0;
+
+	VkPhysicalDeviceProperties properties{};
+	vkGetPhysicalDeviceProperties(device, &properties);
+
+	VkPhysicalDeviceFeatures features{};
+	vkGetPhysicalDeviceFeatures(device, &features);
+
+	if (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
+		score += 1000;
+
+	score += properties.limits.maxImageDimension2D;
+
+	if (!features.geometryShader)
+		return 0;
+	return score;
 }
 
 void GraphicsEngine::createDebugMessenger()
@@ -1153,6 +1158,11 @@ void GraphicsEngine::drawFrame()
 {
 	vkWaitForFences(m_Device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
 	
+	static double lastTime = glfwGetTime();
+	double currentTime = glfwGetTime();
+
+	double deltaTime = currentTime - lastTime;
+	lastTime = currentTime;
 
 	uint32_t imageIndex;
 	VkResult result = vkAcquireNextImageKHR(m_Device, m_Swapchain, UINT64_MAX, imageReadySemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
@@ -1171,7 +1181,7 @@ void GraphicsEngine::drawFrame()
 
 	vkResetCommandBuffer(m_CommandBuffers[currentFrame], 0);
 
-	mCamera.processInput(m_Window);
+	mCamera.processInput(m_Window, deltaTime);
 	updateUniformBuffer(currentFrame);
 
 	mPlanet.Update({ mCamera.getPosition().x, mCamera.getPosition().z }, currentFrame);

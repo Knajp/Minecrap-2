@@ -12,16 +12,19 @@ public:
 	Camera(Camera&) = delete;
 
 	MVP& getMatrices();
-	void processInput(GLFWwindow* window);
+	void processInput(GLFWwindow* window, float deltaTime);
 	void modifyAspectRatio(float newAR);
 
 	glm::vec3 getPosition() const;
 private:
 
 	glm::vec3 mOrientation;
+	glm::vec3 mFacing;
 	glm::vec3 mPosition;
 	glm::vec3 mUp;
-	float mSpeed = 0.01f;
+	glm::vec3 mVelocity;
+
+	float mSpeed = 20.0f;
 	float mMouseSens = 100.0f;
 	MVP mMatrices;
 };
