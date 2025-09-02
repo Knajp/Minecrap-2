@@ -24,7 +24,7 @@ private:
 	glm::vec3 mUp;
 	glm::vec3 mVelocity;
 
-	float mSpeed = 20.0f;
+	float mSpeed = 0.5f;
 	float mMouseSens = 100.0f;
 	MVP mMatrices;
 };

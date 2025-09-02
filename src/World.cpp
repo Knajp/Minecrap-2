@@ -214,9 +214,9 @@ ChunkData::~ChunkData()
 
 bool ChunkData::allocateChunkData(glm::ivec2 chunkCoords)
 {
-    static double scale = 0.01;
+    static float scale = 0.01f;
     static int octaves = 6;
-    static double persistance = 0.48;
+    static float persistance = 0.48f;
 
     
     static siv::BasicPerlinNoise<float> noise(static_cast<uint32_t>(glfwGetTime() * 1000));
@@ -227,18 +227,18 @@ bool ChunkData::allocateChunkData(glm::ivec2 chunkCoords)
                 int64_t globalX = (uint64_t)chunkCoords.x * CHUNKSIZE + x;
                 int64_t globalZ = (uint64_t)chunkCoords.y * CHUNKSIZE + z;
 
-                double nx = globalX * scale;
-                double nz = globalZ * scale;
+                float nx = globalX * scale;
+                float nz = globalZ * scale;
 
                 double n = noise.normalizedOctave2D_01(nx, nz, octaves, persistance);
 
-                uint16_t height = CHUNKHEIGHT * n;
+                uint16_t height = static_cast<uint16_t>(CHUNKHEIGHT * n);
                 
                 if (y < height)
                     pData[x * CHUNKHEIGHT * CHUNKSIZE + y * CHUNKSIZE + z] = BLOCKTYPE::AIR;          // above terrain
                 else if (y == height)
                     pData[x * CHUNKHEIGHT * CHUNKSIZE + y * CHUNKSIZE + z] = BLOCKTYPE::GRASS;        // surface
-                else if (y <= height + 5)
+                else if (y <= (size_t)height + 5)
                     pData[x * CHUNKHEIGHT * CHUNKSIZE + y * CHUNKSIZE + z] = BLOCKTYPE::DIRT;         // top layers below surface
                 else
                     pData[x * CHUNKHEIGHT * CHUNKSIZE + y * CHUNKSIZE + z] = BLOCKTYPE::STONE;
@@ -287,7 +287,7 @@ bool ChunkData::isFaceVisible(glm::ivec3 blockPos, BLOCKFACE face)
 
     
 
-    if (idx < 0 || static_cast<size_t>(idx) >= CHUNKHEIGHT * CHUNKSIZE * CHUNKSIZE) return true; // if out of array bounds
+    if (idx < 0 || static_cast<size_t>(idx) >= (size_t)CHUNKHEIGHT * (size_t)CHUNKSIZE * (size_t)CHUNKSIZE) return true; // if out of array bounds
 
     assert(pData);
 
@@ -308,22 +308,22 @@ void ChunkData::generateTrees(glm::ivec2 chunkCoords)
 {
     static uint8_t minDistance = 4;
 
-    static double scale = 0.3;
+    static float scale = 0.3f;
     static int octaves = 6;
-    static double persistance = 0.6;
+    static float persistance = 0.6f;
 
     static siv::BasicPerlinNoise<float> treeNoise(rand());
 
     std::vector<glm::ivec2> placedTrees = {};
 
-    double globalX, globalZ;
+    float globalX, globalZ;
     for (int x = 0; x < CHUNKSIZE; x++)
     {
-        globalX = (int64_t)chunkCoords.x * CHUNKSIZE + x;
+        globalX = static_cast<float>(chunkCoords.x * CHUNKSIZE + x);
         globalX *= scale;
         for (int z = 0; z < CHUNKSIZE; z++)
         {
-            globalZ = (int64_t)chunkCoords.y * CHUNKSIZE + z;
+            globalZ = static_cast<float>(chunkCoords.y * CHUNKSIZE + z);
             globalZ *= scale;
 
             float noise = treeNoise.normalizedOctave2D_01(globalX, globalZ, octaves, persistance);
@@ -339,18 +339,35 @@ void ChunkData::generateTrees(glm::ivec2 chunkCoords)
 
 void ChunkData::placeTree(glm::ivec3 baseCoords)
 {
+    int idx = 0;
     for (int y = 3; y <= 6; y++)
         for(int x = -2; x <= 2; x++)
             for (int z = -2; z <= 2; z++)
             {
                 if (y == 6 && abs(x) + abs(z) == 1)
-                    pData[getBlockIndex({ baseCoords.x + x, baseCoords.y - y, baseCoords.z + z})] = LEAVES;
-                else if(y == 5 && abs(x) < 2 && abs(z) < 2)
-                    pData[getBlockIndex({ baseCoords.x + x, baseCoords.y - y, baseCoords.z + z })] = LEAVES;
-                else if(y == 4 && abs(x) + abs(z) != 4)
-                   pData[getBlockIndex({ baseCoords.x + x, baseCoords.y - y, baseCoords.z + z })] = LEAVES;
-                else if(y ==3)
-                    pData[getBlockIndex({ baseCoords.x + x, baseCoords.y - y, baseCoords.z + z })] = LEAVES;
+                {
+                    idx = getBlockIndex({ baseCoords.x + x, baseCoords.y - y, baseCoords.z + z });
+                    if(idx != -1)
+                        pData[idx] = LEAVES;
+                }
+                else if (y == 5 && abs(x) < 2 && abs(z) < 2)
+                {
+                    idx = getBlockIndex({ baseCoords.x + x, baseCoords.y - y, baseCoords.z + z });
+                    if (idx != -1)
+                        pData[idx] = LEAVES;
+                }
+                else if (y == 4 && abs(x) + abs(z) != 4)
+                {
+                    idx = getBlockIndex({ baseCoords.x + x, baseCoords.y - y, baseCoords.z + z });
+                    if (idx != -1)
+                        pData[idx] = LEAVES;
+                }
+                else if (y == 3)
+                {
+                    idx = getBlockIndex({ baseCoords.x + x, baseCoords.y - y, baseCoords.z + z });
+                    if (idx != -1)
+                        pData[idx] = LEAVES;
+                }
 
             }
                 
@@ -367,6 +384,7 @@ int ChunkData::getTopBlock(glm::ivec2 coords)
     {
         if (pData[getBlockIndex({ coords.x, i, coords.y })] != AIR) return i;
     }
+    return 255;
 }
 
 bool ChunkData::canPlaceTree(const std::vector<glm::ivec2>& treeVector, glm::ivec2 coords)
