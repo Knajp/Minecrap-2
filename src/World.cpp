@@ -48,12 +48,12 @@ void Chunk::generateMesh()
             uint8_t topTexture = getBlockTextureIndex(bType, BLOCKFACE::TOP);
             uint8_t bottomTexture = getBlockTextureIndex(bType, BLOCKFACE::BOTTOM);
 
-            int& forwardIndices = (bType == LEAVES) ? forwardIndicesTransparent : forwardIndicesFull;
+            int& forwardIndices = (bType == LEAVES || bType == TALLGRASS) ? forwardIndicesTransparent : forwardIndicesFull;
 
             targetVertexVector = &mMeshVertices;
             targetIndexVector = &mMeshIndices;
             
-            if (bType == LEAVES)
+            if (bType == LEAVES || bType == TALLGRASS)
             {
                 targetVertexVector = &mTransparentMeshVertices;
                 targetIndexVector = &mTransparentMeshIndices;
@@ -243,7 +243,7 @@ bool ChunkData::allocateChunkData(glm::ivec2 chunkCoords)
                 else
                     pData[x * CHUNKHEIGHT * CHUNKSIZE + y * CHUNKSIZE + z] = BLOCKTYPE::STONE;
             }
-            
+    generateGrass(chunkCoords);
     generateTrees(chunkCoords);
     return true;
 }
@@ -291,7 +291,7 @@ bool ChunkData::isFaceVisible(glm::ivec3 blockPos, BLOCKFACE face)
 
     assert(pData);
 
-    if (pData[idx] == AIR || (pData[idx] == LEAVES && pData[getBlockIndex(blockPos)] != LEAVES)) return true;
+    if (pData[idx] == AIR || pData[idx] == TALLGRASS|| (pData[idx] == LEAVES && pData[getBlockIndex(blockPos)] != LEAVES)) return true;
 
 
     return false;
@@ -396,6 +396,32 @@ bool ChunkData::canPlaceTree(const std::vector<glm::ivec2>& treeVector, glm::ive
         if (deltaVector.x + deltaVector.y < 4) return false;
     }
     return true;
+}
+
+void ChunkData::generateGrass(glm::ivec2 chunkCoords)
+{
+    static float scale = 0.3f;
+    static int octaves = 6;
+    static float persistance = 0.6f;
+
+    siv::BasicPerlinNoise<float> grassNoise;
+
+    float globalX, globalZ;
+    for (int x = 0; x <= CHUNKSIZE; x++)
+    {
+        globalX = chunkCoords.x * CHUNKSIZE + x;
+        globalX *= scale;
+        for (int z = 0; z <= CHUNKSIZE; z++)
+        {
+            globalZ = chunkCoords.y * CHUNKSIZE + z;
+            globalZ *= scale;
+            float noise = grassNoise.normalizedOctave2D_01(globalX, globalZ, octaves, persistance);
+
+            if (noise > 0.7f)
+                pData[getBlockIndex({ x, getTopBlock({x,z}) - 1, z })] = TALLGRASS;
+
+        }
+    }
 }
 
 Planet::Planet()

@@ -12,7 +12,7 @@ constexpr unsigned short int CHUNKHEIGHT = 64;
 constexpr uint8_t MAX_FRAMES_IN_FLIGHT = 3;
 
 enum BLOCKTYPE {
-	AIR, GRASS, DIRT, STONE, WOOD, LEAVES
+	AIR, GRASS, DIRT, STONE, WOOD, LEAVES, TALLGRASS
 };
 enum BLOCKFACE {
 	FRONT, BACK, RIGHT, LEFT, TOP, BOTTOM
@@ -63,6 +63,8 @@ static uint8_t getBlockTextureIndex(BLOCKTYPE bType, BLOCKFACE bFace)
 		}
 	case LEAVES:
 		return 6;
+	case TALLGRASS:
+		return 7;
 	default:
 		return 99;
 	}
@@ -85,6 +87,7 @@ public:
 	void placeTree(glm::ivec3 baseCoords);
 	int getTopBlock(glm::ivec2 coords);
 	bool canPlaceTree(const std::vector<glm::ivec2>& treeVector, glm::ivec2 coords);
+	void generateGrass(glm::ivec2 chunkCoords);
 private:
 	uint8_t* pData;
 };
