@@ -18,6 +18,8 @@ enum BLOCKFACE {
 	FRONT, BACK, RIGHT, LEFT, TOP, BOTTOM
 };
 
+
+
 namespace std {
 	template <>
 	struct hash<glm::ivec2> {
@@ -134,6 +136,8 @@ private:
 	VkDeviceMemory mTransparentIndexBufferMemory;
 
 	bool pendingDeletion = false;
+
+	inline static std::vector<BLOCKTYPE> billboards = { TALLGRASS };
 };
 
 struct ChunkFreeList
@@ -157,5 +161,5 @@ public:
 private:
 	std::unordered_map<glm::ivec2, Chunk> mChunks; 
 	std::array<ChunkFreeList, MAX_FRAMES_IN_FLIGHT> mAwaitngDestruction;
-	const uint8_t renderDistance = 4;
+	const uint8_t renderDistance = 1;
 };

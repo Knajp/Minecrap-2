@@ -678,7 +678,7 @@ void GraphicsEngine::createTextureSampler()
 	createInfo.unnormalizedCoordinates = VK_FALSE;
 	createInfo.compareEnable = VK_FALSE;
 	createInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-	createInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+	createInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
 	createInfo.mipLodBias = 0.0f;
 	createInfo.minLod = 0.0f;
 	createInfo.maxLod = 0.0f;
