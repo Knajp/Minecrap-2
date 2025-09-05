@@ -27,7 +27,7 @@ void Camera::processInput(GLFWwindow* window, float deltaTime)
 		glfwSetWindowShouldClose(window, true);
 
 	// Damp and Apply velocity to player
-	mVelocity *= 0.98f;
+	mVelocity *= 55.0f * deltaTime;
 	mPosition += mVelocity;
 
 	double mouseX, mouseY;

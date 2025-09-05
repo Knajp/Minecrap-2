@@ -408,7 +408,8 @@ int ChunkData::getTopBlock(glm::ivec2 coords)
     {
         int idx = getBlockIndex({ coords.x, i, coords.y });
         if (idx == -1) return 63;
-        if (pData[idx] != AIR) return i; //heap overflow
+        if (pData[idx] != AIR && std::find(Chunk::billboards.begin(), Chunk::billboards.end(), pData[idx]) == Chunk::billboards.end()) return i;
+
     }
     return 63;
 }

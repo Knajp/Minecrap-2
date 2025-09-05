@@ -114,6 +114,8 @@ public:
 
 	bool isPendingDeletion() const;
 	void setPendingDeletionStatus(bool val);
+	inline static std::vector<BLOCKTYPE> billboards = { TALLGRASS };
+
 private:
 	std::vector<Vertex> mMeshVertices;
 	std::vector<uint16_t> mMeshIndices;
@@ -137,7 +139,6 @@ private:
 
 	bool pendingDeletion = false;
 
-	inline static std::vector<BLOCKTYPE> billboards = { TALLGRASS };
 };
 
 struct ChunkFreeList
