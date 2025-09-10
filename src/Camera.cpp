@@ -27,11 +27,12 @@ void Camera::processInput(GLFWwindow* window, float deltaTime)
 	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
 		glfwSetWindowShouldClose(window, true);
 
-	mVelocity += acceleration * deltaTime;
 
-	// Damp and Apply velocity to player
-	mVelocity -= mVelocity * 10.0f * deltaTime;
-	mPosition += mVelocity;
+	mVelocity += acceleration;
+
+	mVelocity -= mVelocity * 0.6f * deltaTime;
+
+	mPosition += mVelocity * deltaTime;
 
 	double mouseX, mouseY;
 	glfwGetCursorPos(window, &mouseX, &mouseY);

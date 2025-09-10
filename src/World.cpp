@@ -5,6 +5,8 @@
 #include "PerlinNoise.hpp"
 #include <random>
 #include <algorithm>
+#include <thread>
+#include <mutex>
 
 Chunk::Chunk(glm::ivec2 aWorldPos)
     :mWorldPosition(aWorldPos), mData(aWorldPos)
@@ -16,6 +18,35 @@ Chunk::Chunk(glm::ivec2 aWorldPos)
 Chunk::~Chunk()
 {
     
+}
+
+Chunk::Chunk(Chunk&& other) noexcept
+    : mMeshVertices(std::move(other.mMeshVertices)),
+    mMeshIndices(std::move(other.mMeshIndices)),
+    mTransparentMeshVertices(std::move(other.mTransparentMeshVertices)),
+    mTransparentMeshIndices(std::move(other.mTransparentMeshIndices)),
+    mWorldPosition(other.mWorldPosition),
+    mData(std::move(other.mData)),
+    mVertexBuffer(other.mVertexBuffer),
+    mVertexBufferMemory(other.mVertexBufferMemory),
+    mIndexBuffer(other.mIndexBuffer),
+    mIndexBufferMemory(other.mIndexBufferMemory),
+    mTransparentVertexBuffer(other.mTransparentVertexBuffer),
+    mTransparentVertexBuffferMemory(other.mTransparentVertexBuffferMemory),
+    mTransparentIndexBuffer(other.mTransparentIndexBuffer),
+    mTransparentIndexBufferMemory(other.mTransparentIndexBufferMemory),
+    pendingDeletion(other.pendingDeletion)
+{
+    // Invalidate the moved-from chunk's handles so they don't get destroyed twice
+    other.mVertexBuffer = VK_NULL_HANDLE;
+    other.mVertexBufferMemory = VK_NULL_HANDLE;
+    other.mIndexBuffer = VK_NULL_HANDLE;
+    other.mIndexBufferMemory = VK_NULL_HANDLE;
+
+    other.mTransparentVertexBuffer = VK_NULL_HANDLE;
+    other.mTransparentVertexBuffferMemory = VK_NULL_HANDLE;
+    other.mTransparentIndexBuffer = VK_NULL_HANDLE;
+    other.mTransparentIndexBufferMemory = VK_NULL_HANDLE;
 }
 
 void Chunk::generateMesh()
@@ -513,15 +544,34 @@ void Planet::onPlayerCrossedChunk(glm::ivec2 plrChunk, uint32_t currentFrame)
         
         ++it;
     }
+
+    std::mutex chunkMutex;
+    std::vector<std::thread> threads;
+
     for(int i = -renderDistance; i <= renderDistance; i++) 
         for (int j = -renderDistance; j <= renderDistance; j++)
         {
             glm::ivec2 newChunkCoords = { plrChunk.x + i, plrChunk.y + j };
-            if (mChunks.count(newChunkCoords) == 0)
+
             {
-                mChunks.try_emplace(newChunkCoords, newChunkCoords);
+                std::lock_guard<std::mutex> lock(chunkMutex);
+                if (mChunks.count(newChunkCoords) != 0)
+                    continue;
             }
+
+            threads.emplace_back([this, newChunkCoords, &chunkMutex]() {
+
+                Chunk chunk(newChunkCoords);
+
+                std::lock_guard<std::mutex> lock(chunkMutex);
+                mChunks.try_emplace(newChunkCoords, std::move(chunk));
+
+                });
         }
+
+    for (auto& t : threads) {
+        t.join();
+    }
 }
 
 void Planet::Render(VkCommandBuffer commandBuffer, VkPipelineLayout& layout)
@@ -548,3 +598,4 @@ void Planet::Cleanup(uint32_t currentFrame, VkDevice& device)
     }
     mAwaitngDestruction[currentFrame].chunkList.clear();
 }
+

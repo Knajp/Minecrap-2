@@ -82,8 +82,8 @@ public:
 	ChunkData(glm::ivec2 chunkCoords);
 	~ChunkData();
 
-	ChunkData(const ChunkData&) = delete;
-	ChunkData& operator=(const ChunkData&) = delete;
+	ChunkData(const ChunkData&) = default;
+	ChunkData& operator=(const ChunkData&) = default;
 
 	bool allocateChunkData(glm::ivec2 chunkCoords);
 	uint8_t* getData();
@@ -106,8 +106,8 @@ public:
 
 	~Chunk();
 
-	Chunk(const Chunk&) = delete;
-	Chunk& operator=(const Chunk&) = delete;
+	Chunk(Chunk&& other) noexcept;
+	Chunk& operator=(Chunk&&) noexcept = default;
 	
 	
 
