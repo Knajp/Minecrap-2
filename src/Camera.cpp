@@ -9,25 +9,28 @@ MVP& Camera::getMatrices()
 
 void Camera::processInput(GLFWwindow* window, float deltaTime)
 {
+	glm::vec3 acceleration(0.0f);
 	//KEYBOARD INPUT
 	if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-		mVelocity += mFacing * mSpeed * deltaTime;
+		acceleration += mFacing * mSpeed;
 	if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-		mVelocity += mFacing * -mSpeed * deltaTime;
+		acceleration += mFacing * -mSpeed;
 	if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-		mVelocity += glm::normalize(glm::cross(mUp, mFacing)) * mSpeed * deltaTime;
+		acceleration += glm::normalize(glm::cross(mUp, mFacing)) * mSpeed;
 	if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-		mVelocity += glm::normalize(glm::cross(mUp, mFacing)) * -mSpeed * deltaTime;
+		acceleration += glm::normalize(glm::cross(mUp, mFacing)) * -mSpeed;
 	if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
-		mVelocity += mUp * -mSpeed * deltaTime;
+		acceleration += mUp * -mSpeed;
 	if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
-		mVelocity += mUp * mSpeed * deltaTime;
+		acceleration += mUp * mSpeed;
 
 	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
 		glfwSetWindowShouldClose(window, true);
 
+	mVelocity += acceleration * deltaTime;
+
 	// Damp and Apply velocity to player
-	mVelocity *= 55.0f * deltaTime;
+	mVelocity -= mVelocity * 10.0f * deltaTime;
 	mPosition += mVelocity;
 
 	double mouseX, mouseY;

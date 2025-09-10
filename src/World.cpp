@@ -84,10 +84,10 @@ void Chunk::generateMesh()
             {
                 if (mData.isFaceVisible({ x, y, z }, FRONT))
                 {
-                    targetVertexVector->push_back(Vertex{ glm::vec3(x, y + 1.0f, z), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((frontTexture % 10) * 0.1f, (frontTexture / 10) * 0.1f) });
-                    targetVertexVector->push_back(Vertex{ glm::vec3(x, y, z), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((frontTexture % 10) * 0.1f, (frontTexture / 10) * 0.1f + 0.1f) });
-                    targetVertexVector->push_back(Vertex{ glm::vec3(x + 1.0f,  y, z), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((frontTexture % 10) * 0.1f + 0.1f, (frontTexture / 10) * 0.1f + 0.1f) });
-                    targetVertexVector->push_back(Vertex{ glm::vec3(x + 1.0f,  y + 1.0f, z), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((frontTexture % 10) * 0.1f + 0.1f, (frontTexture / 10) * 0.1f) });
+                    targetVertexVector->push_back(Vertex{ glm::vec3(x, y + 1.0f, z), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((frontTexture % 10) * 0.1f, (frontTexture / 10) * 0.1f + 0.1f) });
+                    targetVertexVector->push_back(Vertex{ glm::vec3(x, y, z), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((frontTexture % 10) * 0.1f, (frontTexture / 10) * 0.1f) });
+                    targetVertexVector->push_back(Vertex{ glm::vec3(x + 1.0f,  y, z), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((frontTexture % 10) * 0.1f + 0.1f, (frontTexture / 10) * 0.1f) });
+                    targetVertexVector->push_back(Vertex{ glm::vec3(x + 1.0f,  y + 1.0f, z), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((frontTexture % 10) * 0.1f + 0.1f, (frontTexture / 10) * 0.1f + 0.1f) });
 
                     for (const uint16_t& index : Indices)
                         targetIndexVector->push_back(index + forwardIndices);
@@ -315,7 +315,7 @@ bool ChunkData::isFaceVisible(glm::ivec3 blockPos, BLOCKFACE face)
 
     assert(pData);
 
-    if (pData[idx] == AIR || pData[idx] == TALLGRASS|| (pData[idx] == LEAVES && pData[getBlockIndex(blockPos)] != LEAVES)) return true;
+    if (pData[idx] == AIR || std::find(Chunk::billboards.begin(), Chunk::billboards.end(), pData[idx]) != Chunk::billboards.end() || (pData[idx] == LEAVES && pData[getBlockIndex(blockPos)] != LEAVES)) return true;
 
 
     return false;
@@ -446,7 +446,13 @@ void ChunkData::generateGrass(glm::ivec2 chunkCoords)
 
             int idx = getBlockIndex({ x, getTopBlock({x,z}) - 1, z });
 
-            if (noise > 0.55f && idx != -1)
+            if (idx == -1) continue;
+
+            if (noise > 0.7f)
+                pData[idx] = PURPLEFLOWER;
+            else if (noise > 0.65f)
+                pData[idx] = REDFLOWER;
+            else if (noise > 0.55f)
                 pData[idx] = TALLGRASS;
 
         }

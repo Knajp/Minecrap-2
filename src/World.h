@@ -12,7 +12,7 @@ constexpr unsigned short int CHUNKHEIGHT = 64;
 constexpr uint8_t MAX_FRAMES_IN_FLIGHT = 3;
 
 enum BLOCKTYPE {
-	AIR, GRASS, DIRT, STONE, WOOD, LEAVES, TALLGRASS
+	AIR, GRASS, DIRT, STONE, WOOD, LEAVES, TALLGRASS, REDFLOWER, PURPLEFLOWER
 };
 enum BLOCKFACE {
 	FRONT, BACK, RIGHT, LEFT, TOP, BOTTOM
@@ -67,6 +67,10 @@ static uint8_t getBlockTextureIndex(BLOCKTYPE bType, BLOCKFACE bFace)
 		return 6;
 	case TALLGRASS:
 		return 7;
+	case REDFLOWER:
+		return 8;
+	case PURPLEFLOWER:
+		return 9;
 	default:
 		return 99;
 	}
@@ -114,7 +118,7 @@ public:
 
 	bool isPendingDeletion() const;
 	void setPendingDeletionStatus(bool val);
-	inline static std::vector<BLOCKTYPE> billboards = { TALLGRASS };
+	inline static std::vector<BLOCKTYPE> billboards = { TALLGRASS, REDFLOWER, PURPLEFLOWER };
 
 private:
 	std::vector<Vertex> mMeshVertices;
@@ -162,5 +166,5 @@ public:
 private:
 	std::unordered_map<glm::ivec2, Chunk> mChunks; 
 	std::array<ChunkFreeList, MAX_FRAMES_IN_FLIGHT> mAwaitngDestruction;
-	const uint8_t renderDistance = 1;
+	const uint8_t renderDistance = 4;
 };
