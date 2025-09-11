@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include <functional>
 #include <iostream>
+#include <unordered_set>
 constexpr unsigned short int CHUNKSIZE = 16;
 constexpr unsigned short int CHUNKHEIGHT = 64;
 
@@ -88,6 +89,7 @@ public:
 	bool allocateChunkData(glm::ivec2 chunkCoords);
 	uint8_t* getData();
 	bool isFaceVisible(glm::ivec3 blockPos, BLOCKFACE face);
+	bool isBlockTransparent(BLOCKTYPE type);
 	int getBlockIndex(glm::ivec3 blockCoords);
 	void generateTrees(glm::ivec2 chunkCoords);
 	void placeTree(glm::ivec3 baseCoords);
@@ -119,7 +121,9 @@ public:
 
 	bool isPendingDeletion() const;
 	void setPendingDeletionStatus(bool val);
-	inline static std::vector<BLOCKTYPE> billboards = { TALLGRASS, REDFLOWER, PURPLEFLOWER };
+	bool hasGPUbuffers() const;
+	inline static std::unordered_set<BLOCKTYPE> billboards = { TALLGRASS, REDFLOWER, PURPLEFLOWER };
+	inline static std::unordered_set<BLOCKTYPE> transparentBlocks = { TALLGRASS, REDFLOWER, PURPLEFLOWER, LEAVES };
 
 private:
 	std::vector<Vertex> mMeshVertices;

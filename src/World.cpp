@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <mutex>
 #include <future>
+#include <chrono>
 
 Chunk::Chunk(glm::ivec2 aWorldPos)
     :mWorldPosition(aWorldPos), mData(aWorldPos)
@@ -51,6 +52,7 @@ Chunk::Chunk(Chunk&& other) noexcept
 
 void Chunk::generateMesh()
 {
+    //auto start = std::chrono::high_resolution_clock::now();
     uint8_t* data = mData.getData();
 
     std::vector<uint16_t> Indices = {
@@ -83,7 +85,7 @@ void Chunk::generateMesh()
             uint8_t topTexture = getBlockTextureIndex(bType, BLOCKFACE::TOP);
             uint8_t bottomTexture = getBlockTextureIndex(bType, BLOCKFACE::BOTTOM);
 
-            int& forwardIndices = (bType == LEAVES || std::find(billboards.begin(), billboards.end(), bType) != billboards.end()) ? forwardIndicesTransparent : forwardIndicesFull;
+            int& forwardIndices = transparentBlocks.count(bType) != 0 ? forwardIndicesTransparent : forwardIndicesFull;
 
             targetVertexVector = &mMeshVertices;
             targetIndexVector = &mMeshIndices;
@@ -94,7 +96,7 @@ void Chunk::generateMesh()
                 targetIndexVector = &mTransparentMeshIndices;
             }
 
-            if (std::find(billboards.begin(), billboards.end(), bType) != billboards.end())
+            if (billboards.count(bType) != 0)
             {
                 targetVertexVector->push_back(Vertex{ glm::vec3(x + 0.1f, y + 1.0f, z + 0.1f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((frontTexture % 10) * 0.1f, (frontTexture / 10) * 0.1f + 0.1f) });
                 targetVertexVector->push_back(Vertex{ glm::vec3(x + 0.1f, y + 0.2f, z + 0.1f), glm::vec3(0.0f, 1.0f, 0.0f),        glm::vec2((frontTexture % 10) * 0.1f, (frontTexture / 10) * 0.1f) });
@@ -186,6 +188,10 @@ void Chunk::generateMesh()
             }
         }
     
+        //auto end = std::chrono::high_resolution_clock::now();
+
+        //auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+        //std::cout << "Time from start to finish of generate mesh: " << duration.count() << "\n";
     
     
 }
@@ -256,6 +262,11 @@ bool Chunk::isPendingDeletion() const
 void Chunk::setPendingDeletionStatus(bool val)
 {
     pendingDeletion = val;
+}
+
+bool Chunk::hasGPUbuffers() const 
+{
+    return mVertexBuffer != VK_NULL_HANDLE;
 }
 
 ChunkData::ChunkData(glm::ivec2 chunkCoords)
@@ -348,9 +359,13 @@ bool ChunkData::isFaceVisible(glm::ivec3 blockPos, BLOCKFACE face)
 
     assert(pData);
 
-    if (pData[idx] == AIR || std::find(Chunk::billboards.begin(), Chunk::billboards.end(), pData[idx]) != Chunk::billboards.end() || (pData[idx] == LEAVES && pData[getBlockIndex(blockPos)] != LEAVES)) return true;
+    if (pData[idx] == AIR || Chunk::transparentBlocks.count((BLOCKTYPE)pData[idx]) != 0)  return true;
 
+    return false;
+}
 
+bool ChunkData::isBlockTransparent(BLOCKTYPE type)
+{
     return false;
 }
 
@@ -441,7 +456,7 @@ int ChunkData::getTopBlock(glm::ivec2 coords)
     {
         int idx = getBlockIndex({ coords.x, i, coords.y });
         if (idx == -1) return 63;
-        if (pData[idx] != AIR && std::find(Chunk::billboards.begin(), Chunk::billboards.end(), pData[idx]) == Chunk::billboards.end()) return i;
+        if (pData[idx] != AIR && Chunk::billboards.count((BLOCKTYPE)pData[idx]) == 0) return i;
 
     }
     return 63;
@@ -548,6 +563,7 @@ void Planet::onPlayerCrossedChunk(glm::ivec2 plrChunk, uint32_t currentFrame)
     }
 
     std::mutex chunkListMutex;
+    unsigned maxThreads = std::max(1u, std::thread::hardware_concurrency());
     std::vector<std::future<void>> futures;
 
     for(int i = -renderDistance; i <= renderDistance; i++) 
@@ -573,14 +589,22 @@ void Planet::onPlayerCrossedChunk(glm::ivec2 plrChunk, uint32_t currentFrame)
 
 
                 }));
+
+            if (futures.size() >= maxThreads)
+            {
+                for (auto& f : futures) 
+                    f.get();
+                futures.clear();
+            }
+                
         }
 
     for (auto& f : futures) {
         f.get();
     }
-    for (auto& pair : mChunks) {
-        pair.second.createGPUBuffers();
-    }
+    for (auto& pair : mChunks) 
+        if (!pair.second.hasGPUbuffers())
+            pair.second.createGPUBuffers();
 
 }
 
