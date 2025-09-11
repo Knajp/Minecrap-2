@@ -5,8 +5,8 @@
 #include "PerlinNoise.hpp"
 #include <random>
 #include <algorithm>
-#include <thread>
 #include <mutex>
+#include <future>
 
 Chunk::Chunk(glm::ivec2 aWorldPos)
     :mWorldPosition(aWorldPos), mData(aWorldPos)
@@ -185,6 +185,13 @@ void Chunk::generateMesh()
                 }
             }
         }
+    
+    
+    
+}
+
+void Chunk::createGPUBuffers()
+{
     GraphicsEngine::createVertexBuffer(mMeshVertices, mVertexBuffer, mVertexBufferMemory);
     GraphicsEngine::createIndexBuffer(mMeshIndices, mIndexBuffer, mIndexBufferMemory);
 
@@ -193,11 +200,6 @@ void Chunk::generateMesh()
         GraphicsEngine::createVertexBuffer(mTransparentMeshVertices, mTransparentVertexBuffer, mTransparentVertexBuffferMemory);
         GraphicsEngine::createIndexBuffer(mTransparentMeshIndices, mTransparentIndexBuffer, mTransparentIndexBufferMemory);
     }
-    
-
-    //mMeshVertices.clear();
-    //mMeshIndices.clear();
-    
 }
 
 void Chunk::Render(VkCommandBuffer commandBuffer) const
@@ -545,33 +547,41 @@ void Planet::onPlayerCrossedChunk(glm::ivec2 plrChunk, uint32_t currentFrame)
         ++it;
     }
 
-    std::mutex chunkMutex;
-    std::vector<std::thread> threads;
+    std::mutex chunkListMutex;
+    std::vector<std::future<void>> futures;
 
     for(int i = -renderDistance; i <= renderDistance; i++) 
         for (int j = -renderDistance; j <= renderDistance; j++)
         {
             glm::ivec2 newChunkCoords = { plrChunk.x + i, plrChunk.y + j };
 
-            {
-                std::lock_guard<std::mutex> lock(chunkMutex);
-                if (mChunks.count(newChunkCoords) != 0)
-                    continue;
-            }
+            futures.emplace_back(std::async(std::launch::async, [this, newChunkCoords, &chunkListMutex]()
+                {
+                    {
+                        std::lock_guard<std::mutex> lock(chunkListMutex);
+                        if (mChunks.count(newChunkCoords) != 0)
+                            return; 
+                    }
 
-            threads.emplace_back([this, newChunkCoords, &chunkMutex]() {
+                    Chunk chunk(newChunkCoords);
 
-                Chunk chunk(newChunkCoords);
+                    {
+                        std::lock_guard<std::mutex> lock(chunkListMutex);
+                        if (mChunks.count(newChunkCoords) == 0)
+                            mChunks.try_emplace(newChunkCoords, std::move(chunk));
+                    }
 
-                std::lock_guard<std::mutex> lock(chunkMutex);
-                mChunks.try_emplace(newChunkCoords, std::move(chunk));
 
-                });
+                }));
         }
 
-    for (auto& t : threads) {
-        t.join();
+    for (auto& f : futures) {
+        f.get();
     }
+    for (auto& pair : mChunks) {
+        pair.second.createGPUBuffers();
+    }
+
 }
 
 void Planet::Render(VkCommandBuffer commandBuffer, VkPipelineLayout& layout)

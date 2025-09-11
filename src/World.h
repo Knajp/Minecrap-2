@@ -112,6 +112,7 @@ public:
 	
 
 	void generateMesh();
+	void createGPUBuffers();
 	void Render(VkCommandBuffer commandBuffer) const;
 	glm::ivec2 getPosition() const;
 	void destroyChunk() const;
