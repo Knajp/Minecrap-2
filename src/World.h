@@ -83,8 +83,8 @@ public:
 	ChunkData(glm::ivec2 chunkCoords);
 	~ChunkData();
 
-	ChunkData(const ChunkData&) = default;
-	ChunkData& operator=(const ChunkData&) = default;
+	ChunkData(const ChunkData&);
+	ChunkData& operator=(const ChunkData&);
 
 	bool allocateChunkData(glm::ivec2 chunkCoords);
 	uint8_t* getData();
@@ -96,8 +96,11 @@ public:
 	int getTopBlock(glm::ivec2 coords);
 	bool canPlaceTree(const std::vector<glm::ivec2>& treeVector, glm::ivec2 coords);
 	void generateGrass(glm::ivec2 chunkCoords);
+	unsigned int airBlockCount;
+	unsigned int transparentBlockCount;
 private:
 	uint8_t* pData;
+	
 };
 
 class Chunk

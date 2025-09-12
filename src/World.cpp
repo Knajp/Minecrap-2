@@ -52,7 +52,6 @@ Chunk::Chunk(Chunk&& other) noexcept
 
 void Chunk::generateMesh()
 {
-    //auto start = std::chrono::high_resolution_clock::now();
     uint8_t* data = mData.getData();
 
     std::vector<uint16_t> Indices = {
@@ -69,6 +68,13 @@ void Chunk::generateMesh()
     std::vector<Vertex>* targetVertexVector;
     std::vector<uint16_t>* targetIndexVector;
 
+    uint32_t solidBlockCount = 16328 - mData.airBlockCount - mData.transparentBlockCount;
+    mMeshVertices.reserve(solidBlockCount / 2 * 32);
+    mMeshIndices.reserve(solidBlockCount * 36);
+
+    mTransparentMeshVertices.reserve(mData.transparentBlockCount * 32);
+    mTransparentMeshIndices.reserve(mData.transparentBlockCount * 36);
+
     for(int x = 0; x < CHUNKSIZE; x++)
         for (int y = 0; y < CHUNKHEIGHT; y++)
         for (int z = 0; z < CHUNKSIZE; z++)
@@ -76,7 +82,6 @@ void Chunk::generateMesh()
             
             BLOCKTYPE bType = (BLOCKTYPE)data[static_cast<int>(x * CHUNKHEIGHT * CHUNKSIZE + y * CHUNKSIZE + z)];
             if (bType == AIR) continue;
-            mMeshVertices.reserve(mMeshVertices.size() + 24);
 
             uint8_t frontTexture = getBlockTextureIndex(bType, BLOCKFACE::FRONT);
             uint8_t backTexture = getBlockTextureIndex(bType, BLOCKFACE::BACK);
@@ -108,8 +113,17 @@ void Chunk::generateMesh()
                 targetVertexVector->push_back(Vertex{ glm::vec3(x + 0.9f, y + 1.0f, z + 0.1f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((frontTexture % 10) * 0.1f + 0.1f, (frontTexture / 10) * 0.1f + 0.1f) });
                 targetVertexVector->push_back(Vertex{ glm::vec3(x + 0.9f, y + 0.2f, z + 0.1f), glm::vec3(0.0f, 1.0f, 0.0f),       glm::vec2((frontTexture % 10) * 0.1f + 0.1f, (frontTexture / 10) * 0.1f) });
 
-                for (const uint16_t& index : billboardIndices)
-                    targetIndexVector->push_back(index + forwardIndices);
+                const size_t count = billboardIndices.size();
+                const size_t offset = targetIndexVector->size();
+
+                targetIndexVector->resize(offset + count);
+
+                memcpy(targetIndexVector->data() + offset, billboardIndices.data(), count * sizeof(uint16_t));
+
+                uint16_t* dst = targetIndexVector->data() + offset;
+                for (size_t i = 0; i < count; ++i)
+                    dst[i] += forwardIndices;
+
                 forwardIndices += 8;
 
             }
@@ -122,8 +136,17 @@ void Chunk::generateMesh()
                     targetVertexVector->push_back(Vertex{ glm::vec3(x + 1.0f,  y, z), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((frontTexture % 10) * 0.1f + 0.1f, (frontTexture / 10) * 0.1f) });
                     targetVertexVector->push_back(Vertex{ glm::vec3(x + 1.0f,  y + 1.0f, z), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((frontTexture % 10) * 0.1f + 0.1f, (frontTexture / 10) * 0.1f + 0.1f) });
 
-                    for (const uint16_t& index : Indices)
-                        targetIndexVector->push_back(index + forwardIndices);
+                    const size_t count = Indices.size();
+                    const size_t offset = targetIndexVector->size();
+
+                    targetIndexVector->resize(offset + count);
+
+                    memcpy(targetIndexVector->data() + offset, Indices.data(), count * sizeof(uint16_t));
+
+                    uint16_t* dst = targetIndexVector->data() + offset;
+                    for (size_t i = 0; i < count; ++i)
+                        dst[i] += forwardIndices;
+
                     forwardIndices += 4;
                 }
 
@@ -134,8 +157,17 @@ void Chunk::generateMesh()
                     targetVertexVector->push_back(Vertex{ glm::vec3(x,         y,        z + 1.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((backTexture % 10) * 0.1f + 0.1f, (backTexture / 10) * 0.1f) });
                     targetVertexVector->push_back(Vertex{ glm::vec3(x,         y + 1.0f, z + 1.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((backTexture % 10) * 0.1f + 0.1f,        (backTexture / 10) * 0.1f + 0.1f) });
 
-                    for (const uint16_t& index : Indices)
-                        targetIndexVector->push_back(index + forwardIndices);
+                    const size_t count = Indices.size();
+                    const size_t offset = targetIndexVector->size();
+
+                    targetIndexVector->resize(offset + count);
+
+                    memcpy(targetIndexVector->data() + offset, Indices.data(), count * sizeof(uint16_t));
+
+                    uint16_t* dst = targetIndexVector->data() + offset;
+                    for (size_t i = 0; i < count; ++i)
+                        dst[i] += forwardIndices;
+
                     forwardIndices += 4;
                 }
 
@@ -146,8 +178,17 @@ void Chunk::generateMesh()
                     targetVertexVector->push_back(Vertex{ glm::vec3(x,  y + 1.0f, z),        glm::vec3(1.0f, 0.0f, 0.0f), glm::vec2((leftTexture % 10) * 0.1f + 0.1f, (leftTexture / 10) * 0.1f + 0.1f) });
                     targetVertexVector->push_back(Vertex{ glm::vec3(x,  y + 1.0f, z + 1.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec2((leftTexture % 10) * 0.1f,        (leftTexture / 10) * 0.1f + 0.1f) });
 
-                    for (const uint16_t& index : Indices)
-                        targetIndexVector->push_back(index + forwardIndices);
+                    const size_t count = Indices.size();
+                    const size_t offset = targetIndexVector->size();
+
+                    targetIndexVector->resize(offset + count);
+
+                    memcpy(targetIndexVector->data() + offset, Indices.data(), count * sizeof(uint16_t));
+
+                    uint16_t* dst = targetIndexVector->data() + offset;
+                    for (size_t i = 0; i < count; ++i)
+                        dst[i] += forwardIndices;
+
                     forwardIndices += 4;
                 }
 
@@ -158,8 +199,17 @@ void Chunk::generateMesh()
                     targetVertexVector->push_back(Vertex{ glm::vec3(x + 1.0f,  y + 1.0f, z),        glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((rightTexture % 10) * 0.1f + 0.1f, (rightTexture / 10) * 0.1f + 0.1f) });
                     targetVertexVector->push_back(Vertex{ glm::vec3(x + 1.0f,  y + 1.0f, z + 1.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((rightTexture % 10) * 0.1f, (rightTexture / 10) * 0.1f + 0.1f) });
 
-                    for (const uint16_t& index : Indices)
-                        targetIndexVector->push_back(index + forwardIndices);
+                    const size_t count = Indices.size();
+                    const size_t offset = targetIndexVector->size();
+
+                    targetIndexVector->resize(offset + count);
+
+                    memcpy(targetIndexVector->data() + offset, Indices.data(), count * sizeof(uint16_t));
+
+                    uint16_t* dst = targetIndexVector->data() + offset;
+                    for (size_t i = 0; i < count; ++i)
+                        dst[i] += forwardIndices;
+
                     forwardIndices += 4;
                 }
 
@@ -170,8 +220,17 @@ void Chunk::generateMesh()
                     targetVertexVector->push_back(Vertex{ glm::vec3(x + 1.0f, y, z + 1.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((topTexture % 10) * 0.1f + 0.1f, (topTexture / 10) * 0.1f) });
                     targetVertexVector->push_back(Vertex{ glm::vec3(x + 1.0f, y, z),        glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((topTexture % 10) * 0.1f + 0.1f,        (topTexture / 10) * 0.1f + 0.1f) });
 
-                    for (const uint16_t& index : Indices)
-                        targetIndexVector->push_back(index + forwardIndices);
+                    const size_t count = Indices.size();
+                    const size_t offset = targetIndexVector->size();
+
+                    targetIndexVector->resize(offset + count);
+
+                    memcpy(targetIndexVector->data() + offset, Indices.data(), count * sizeof(uint16_t));
+
+                    uint16_t* dst = targetIndexVector->data() + offset;
+                    for (size_t i = 0; i < count; ++i)
+                        dst[i] += forwardIndices;
+
                     forwardIndices += 4;
                 }
                 if (mData.isFaceVisible({ x,y,z }, BOTTOM))
@@ -181,19 +240,22 @@ void Chunk::generateMesh()
                     targetVertexVector->push_back(Vertex{ glm::vec3(x + 1.0f, y + 1.0f, z + 1.0f),  glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((bottomTexture % 10) * 0.1f + 0.1f, (bottomTexture / 10) * 0.1f) });
                     targetVertexVector->push_back(Vertex{ glm::vec3(x + 1.0f, y + 1.0f, z),         glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((bottomTexture % 10) * 0.1f + 0.1f,        (bottomTexture / 10) * 0.1f + 0.1f) });
 
-                    for (const uint16_t& index : Indices)
-                        targetIndexVector->push_back(index + forwardIndices);
+                    const size_t count = Indices.size();
+                    const size_t offset = targetIndexVector->size();
+
+                    targetIndexVector->resize(offset + count);
+
+                    memcpy(targetIndexVector->data() + offset, Indices.data(), count * sizeof(uint16_t));
+
+                    uint16_t* dst = targetIndexVector->data() + offset;
+                    for (size_t i = 0; i < count; ++i)
+                        dst[i] += forwardIndices;
+
                     forwardIndices += 4;
                 }
             }
         }
-    
-        //auto end = std::chrono::high_resolution_clock::now();
-
-        //auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-        //std::cout << "Time from start to finish of generate mesh: " << duration.count() << "\n";
-    
-    
+ 
 }
 
 void Chunk::createGPUBuffers()
@@ -277,7 +339,41 @@ ChunkData::ChunkData(glm::ivec2 chunkCoords)
 
 ChunkData::~ChunkData()
 {
-    delete[] pData;
+    delete[] pData; // double free
+}
+
+ChunkData::ChunkData(const ChunkData& other)
+    : airBlockCount(other.airBlockCount), transparentBlockCount(other.transparentBlockCount)
+{
+    if (other.pData) {
+        pData = new uint8_t[CHUNKSIZE * CHUNKSIZE * CHUNKHEIGHT];
+        std::copy(other.pData, other.pData + CHUNKSIZE * CHUNKSIZE * CHUNKHEIGHT, pData);
+    }
+    else {
+        pData = nullptr;
+    }
+}
+
+ChunkData& ChunkData::operator=(const ChunkData& other)
+{
+    if (this == &other)
+        return *this;
+
+    airBlockCount = other.airBlockCount;
+    transparentBlockCount = other.transparentBlockCount;
+
+    if (other.pData) {
+        if (!pData) {
+            pData = new uint8_t[CHUNKSIZE * CHUNKSIZE * CHUNKHEIGHT];
+        }
+        std::copy(other.pData, other.pData + CHUNKSIZE * CHUNKSIZE * CHUNKHEIGHT, pData);
+    }
+    else {
+        delete[] pData;
+        pData = nullptr;
+    }
+
+    return *this;
 }
 
 bool ChunkData::allocateChunkData(glm::ivec2 chunkCoords)
@@ -303,7 +399,10 @@ bool ChunkData::allocateChunkData(glm::ivec2 chunkCoords)
                 uint16_t height = static_cast<uint16_t>(CHUNKHEIGHT * n);
                 
                 if (y < height)
-                    pData[x * CHUNKHEIGHT * CHUNKSIZE + y * CHUNKSIZE + z] = BLOCKTYPE::AIR;          // above terrain
+                {
+                    pData[x * CHUNKHEIGHT * CHUNKSIZE + y * CHUNKSIZE + z] = BLOCKTYPE::AIR;
+                    airBlockCount++;
+                }
                 else if (y == height)
                     pData[x * CHUNKHEIGHT * CHUNKSIZE + y * CHUNKSIZE + z] = BLOCKTYPE::GRASS;        // surface
                 else if (y <= (size_t)height + 5)
@@ -313,6 +412,7 @@ bool ChunkData::allocateChunkData(glm::ivec2 chunkCoords)
             }
     generateGrass(chunkCoords);
     generateTrees(chunkCoords);
+
     return true;
 }
 
@@ -447,6 +547,8 @@ void ChunkData::placeTree(glm::ivec3 baseCoords)
     for (int y = 1; y <= 6; y++)
         pData[getBlockIndex({ baseCoords.x, baseCoords.y - y, baseCoords.z })] = WOOD;
 
+    transparentBlockCount += 57;
+
 
 }
 
@@ -502,6 +604,8 @@ void ChunkData::generateGrass(glm::ivec2 chunkCoords)
                 pData[idx] = REDFLOWER;
             else if (noise > 0.55f)
                 pData[idx] = TALLGRASS;
+
+            if (noise > 0.55f) transparentBlockCount++;
 
         }
     }
