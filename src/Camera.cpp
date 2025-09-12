@@ -53,6 +53,20 @@ void Camera::processInput(GLFWwindow* window, float deltaTime)
 	glfwSetCursorPos(window, width / 2, height / 2);
 	mMatrices.view = glm::lookAt(mPosition, mPosition + mOrientation, mUp);
 
+
+	// MOUSE INPUT
+
+	if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS)
+	{
+		for (float rayLength = 0.0f; rayLength <= 5.5f; rayLength += 0.1f)
+		{
+			glm::vec3 rayCoord = mPosition + mOrientation * rayLength;
+
+			glm::ivec3 intCoord = { (int)rayCoord.x, (int)rayCoord.y, (int)rayCoord.z };
+
+			//glm::ivec2 chunkCoord = {intCoord.x / 16}
+		}
+	}
 }
 
 void Camera::modifyAspectRatio(float newAR)

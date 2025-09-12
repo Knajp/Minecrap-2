@@ -30,6 +30,21 @@ namespace std {
 			return h1 ^ (h2 + 0x9e3779b9 + (h1 << 6) + (h1 >> 2));
 		}
 	};
+	
+	template<>
+	struct hash<glm::ivec3> {
+		std::size_t operator()(const glm::ivec3& v) const {
+			std::size_t h1 = std::hash<int>()(v.x);
+			std::size_t h2 = std::hash<int>()(v.y);
+			std::size_t h3 = std::hash<int>()(v.z);
+
+			std::size_t seed = h1;
+			seed ^= h2 + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+			seed ^= h3 + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+
+			return seed;
+		}
+	};
 }
 
 
@@ -100,7 +115,7 @@ public:
 	unsigned int transparentBlockCount;
 private:
 	uint8_t* pData;
-	
+	std::unordered_map <glm::ivec3, BLOCKTYPE> mMissingBlocks;
 };
 
 class Chunk
@@ -174,5 +189,6 @@ public:
 private:
 	std::unordered_map<glm::ivec2, Chunk> mChunks; 
 	std::array<ChunkFreeList, MAX_FRAMES_IN_FLIGHT> mAwaitngDestruction;
-	const uint8_t renderDistance = 4;
+	const uint8_t renderDistance = 3;
+	
 };

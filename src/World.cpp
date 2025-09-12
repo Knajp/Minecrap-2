@@ -339,7 +339,7 @@ ChunkData::ChunkData(glm::ivec2 chunkCoords)
 
 ChunkData::~ChunkData()
 {
-    delete[] pData; // double free
+    delete[] pData; 
 }
 
 ChunkData::ChunkData(const ChunkData& other)
@@ -516,30 +516,22 @@ void ChunkData::placeTree(glm::ivec3 baseCoords)
         for(int x = -2; x <= 2; x++)
             for (int z = -2; z <= 2; z++)
             {
-                if (y == 6 && abs(x) + abs(z) == 1)
-                {
-                    idx = getBlockIndex({ baseCoords.x + x, baseCoords.y - y, baseCoords.z + z });
-                    if(idx != -1)
-                        pData[idx] = LEAVES;
-                }
+                idx = getBlockIndex({ baseCoords.x + x, baseCoords.y - y, baseCoords.z + z });
+                if (idx == -1)
+                    mMissingBlocks.emplace(std::make_pair(glm::ivec3(baseCoords.x + x, baseCoords.y - y, baseCoords.z + z), LEAVES));
+
+                else if (y == 6 && abs(x) + abs(z) == 1)
+                    pData[idx] = LEAVES;
+
                 else if (y == 5 && abs(x) < 2 && abs(z) < 2)
-                {
-                    idx = getBlockIndex({ baseCoords.x + x, baseCoords.y - y, baseCoords.z + z });
-                    if (idx != -1)
-                        pData[idx] = LEAVES;
-                }
+                    pData[idx] = LEAVES;
+
                 else if (y == 4 && abs(x) + abs(z) != 4)
-                {
-                    idx = getBlockIndex({ baseCoords.x + x, baseCoords.y - y, baseCoords.z + z });
-                    if (idx != -1)
-                        pData[idx] = LEAVES;
-                }
+                    pData[idx] = LEAVES;
+
                 else if (y == 3)
-                {
-                    idx = getBlockIndex({ baseCoords.x + x, baseCoords.y - y, baseCoords.z + z });
-                    if (idx != -1)
-                        pData[idx] = LEAVES;
-                }
+                    pData[idx] = LEAVES;
+
 
             }
                 
@@ -586,11 +578,11 @@ void ChunkData::generateGrass(glm::ivec2 chunkCoords)
     float globalX, globalZ;
     for (int x = 0; x <= CHUNKSIZE; x++)
     {
-        globalX = chunkCoords.x * CHUNKSIZE + x;
+        globalX = (float)chunkCoords.x * (float)CHUNKSIZE + (float)x;
         globalX *= scale;
         for (int z = 0; z <= CHUNKSIZE; z++)
         {
-            globalZ = chunkCoords.y * CHUNKSIZE + z;
+            globalZ = (float)chunkCoords.y * (float)CHUNKSIZE + (float)z;
             globalZ *= scale;
             float noise = grassNoise.normalizedOctave2D_01(globalX, globalZ, octaves, persistance);
 

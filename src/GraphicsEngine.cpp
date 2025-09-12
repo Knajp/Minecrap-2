@@ -1181,7 +1181,7 @@ void GraphicsEngine::drawFrame()
 
 	vkResetCommandBuffer(m_CommandBuffers[currentFrame], 0);
 
-	mCamera.processInput(m_Window, deltaTime);
+	mCamera.processInput(m_Window, (float)deltaTime);
 	updateUniformBuffer(currentFrame);
 
 	mPlanet.Update({ mCamera.getPosition().x, mCamera.getPosition().z }, currentFrame);

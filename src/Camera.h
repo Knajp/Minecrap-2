@@ -27,4 +27,6 @@ private:
 	float mSpeed = 0.1f;
 	float mMouseSens = 100.0f;
 	MVP mMatrices;
+
+	float mRange = 5.0f;
 };
