@@ -113,9 +113,10 @@ public:
 	void generateGrass(glm::ivec2 chunkCoords);
 	unsigned int airBlockCount;
 	unsigned int transparentBlockCount;
+	std::unordered_map <glm::ivec3, BLOCKTYPE> mMissingBlocks;
+
 private:
 	uint8_t* pData;
-	std::unordered_map <glm::ivec3, BLOCKTYPE> mMissingBlocks;
 };
 
 class Chunk
@@ -142,7 +143,8 @@ public:
 	bool hasGPUbuffers() const;
 	inline static std::unordered_set<BLOCKTYPE> billboards = { TALLGRASS, REDFLOWER, PURPLEFLOWER };
 	inline static std::unordered_set<BLOCKTYPE> transparentBlocks = { TALLGRASS, REDFLOWER, PURPLEFLOWER, LEAVES };
-
+	bool hasMissingBlocks();
+	std::unordered_map<glm::ivec3, BLOCKTYPE>* getMissingBlocks();
 private:
 	std::vector<Vertex> mMeshVertices;
 	std::vector<uint16_t> mMeshIndices;
@@ -186,6 +188,7 @@ public:
 	void onPlayerCrossedChunk(glm::ivec2 plrChunk, uint32_t currentFrame);
 	void Render(VkCommandBuffer commandBuffer, VkPipelineLayout& layout);
 	void Cleanup(uint32_t currentFrame, VkDevice& device);
+	void fillMissingBlocks();
 private:
 	std::unordered_map<glm::ivec2, Chunk> mChunks; 
 	std::array<ChunkFreeList, MAX_FRAMES_IN_FLIGHT> mAwaitngDestruction;

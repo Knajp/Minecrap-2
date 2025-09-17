@@ -603,6 +603,16 @@ void ChunkData::generateGrass(glm::ivec2 chunkCoords)
     }
 }
 
+bool Chunk::hasMissingBlocks()
+{
+    return mData.mMissingBlocks.size() != 0;
+}
+
+std::unordered_map<glm::ivec3, BLOCKTYPE>* Chunk::getMissingBlocks()
+{
+    return &mData.mMissingBlocks;
+}
+
 Planet::Planet()
 {
     srand(static_cast<uint32_t>(glfwGetTime()));
@@ -698,6 +708,9 @@ void Planet::onPlayerCrossedChunk(glm::ivec2 plrChunk, uint32_t currentFrame)
     for (auto& f : futures) {
         f.get();
     }
+
+
+
     for (auto& pair : mChunks) 
         if (!pair.second.hasGPUbuffers())
             pair.second.createGPUBuffers();
@@ -727,5 +740,24 @@ void Planet::Cleanup(uint32_t currentFrame, VkDevice& device)
         mChunks.erase(chunk->getPosition());
     }
     mAwaitngDestruction[currentFrame].chunkList.clear();
+}
+
+void Planet::fillMissingBlocks()
+{
+    for (auto& chunkPair : mChunks)
+    {
+        if (!chunkPair.second.hasMissingBlocks()) continue;
+
+        std::unordered_map<glm::ivec3, BLOCKTYPE>* blockMap = chunkPair.second.getMissingBlocks();
+
+        for (auto& blockPair : *blockMap)
+        {
+            glm::ivec3 globalBlockPos = glm::ivec3(chunkPair.first.x * CHUNKSIZE, 0, chunkPair.first.y * CHUNKSIZE) + blockPair.first;
+
+            // chunkcoords is gbp % chunksize
+            // then get the block coordinate inside there
+            // and replace it with the blockpair.second if not already occupied
+        }
+    }
 }
 
