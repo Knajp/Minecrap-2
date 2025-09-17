@@ -255,7 +255,8 @@ void Chunk::generateMesh()
                 }
             }
         }
- 
+    
+        setNeedRemeshStatus(false);
 }
 
 void Chunk::createGPUBuffers()
@@ -376,6 +377,17 @@ ChunkData& ChunkData::operator=(const ChunkData& other)
     return *this;
 }
 
+ChunkData::ChunkData(ChunkData&& other) noexcept
+    : pData(other.pData),
+    airBlockCount(other.airBlockCount),
+    transparentBlockCount(other.transparentBlockCount),
+    mMissingBlocks(std::move(other.mMissingBlocks))
+{
+    other.pData = nullptr;
+    other.airBlockCount = 0;
+    other.transparentBlockCount = 0;
+}
+
 bool ChunkData::allocateChunkData(glm::ivec2 chunkCoords)
 {
     static float scale = 0.01f;
@@ -413,6 +425,8 @@ bool ChunkData::allocateChunkData(glm::ivec2 chunkCoords)
     generateGrass(chunkCoords);
     generateTrees(chunkCoords);
 
+    std::unordered_map<glm::ivec3, BLOCKTYPE>* address = &mMissingBlocks;
+    std::cout << address << "\n";
     return true;
 }
 
@@ -603,14 +617,28 @@ void ChunkData::generateGrass(glm::ivec2 chunkCoords)
     }
 }
 
-bool Chunk::hasMissingBlocks()
-{
-    return mData.mMissingBlocks.size() != 0;
-}
 
 std::unordered_map<glm::ivec3, BLOCKTYPE>* Chunk::getMissingBlocks()
 {
     return &mData.mMissingBlocks;
+}
+
+void Chunk::updateBlock(glm::ivec3 blockCoords, BLOCKTYPE bType)
+{
+    mData.getData()[mData.getBlockIndex(blockCoords)] = bType;
+    if (transparentBlocks.count(bType) != 0) mData.transparentBlockCount++;
+
+    std::cout << "Block update!\n";
+}
+
+bool Chunk::getNeedRemeshStatus() const
+{
+    return needRemesh;
+}
+
+void Chunk::setNeedRemeshStatus(bool nr)
+{
+    needRemesh = nr;
 }
 
 Planet::Planet()
@@ -644,6 +672,8 @@ void Planet::Update(glm::vec2 playerPosition, uint32_t currentFrame)
 
     lastChunk = { chunkX, chunkY };
 
+    for (auto& chunk : mChunks)
+        if (chunk.second.getNeedRemeshStatus()) chunk.second.generateMesh();
 
 }
 
@@ -709,7 +739,7 @@ void Planet::onPlayerCrossedChunk(glm::ivec2 plrChunk, uint32_t currentFrame)
         f.get();
     }
 
-
+    fillMissingBlocks();
 
     for (auto& pair : mChunks) 
         if (!pair.second.hasGPUbuffers())
@@ -744,20 +774,42 @@ void Planet::Cleanup(uint32_t currentFrame, VkDevice& device)
 
 void Planet::fillMissingBlocks()
 {
+    auto floorDiv = [](int a, int b) {
+        int q = a / b;
+        int r = a % b;
+        if ((r != 0) && ((r > 0) != (b > 0))) --q;
+        return q;
+        };
+
     for (auto& chunkPair : mChunks)
     {
-        if (!chunkPair.second.hasMissingBlocks()) continue;
-
         std::unordered_map<glm::ivec3, BLOCKTYPE>* blockMap = chunkPair.second.getMissingBlocks();
-
+        std::cout << blockMap << "\n";
+        if (blockMap->empty()) continue;
         for (auto& blockPair : *blockMap)
         {
-            glm::ivec3 globalBlockPos = glm::ivec3(chunkPair.first.x * CHUNKSIZE, 0, chunkPair.first.y * CHUNKSIZE) + blockPair.first;
+            glm::ivec3 globalBlockPos = glm::ivec3(chunkPair.first.x * CHUNKSIZE, blockPair.first.y, chunkPair.first.y * CHUNKSIZE) + blockPair.first;
 
-            // chunkcoords is gbp % chunksize
-            // then get the block coordinate inside there
-            // and replace it with the blockpair.second if not already occupied
+            glm::ivec2 targetChunkCoords = {
+                floorDiv(globalBlockPos.x, CHUNKSIZE),
+                floorDiv(globalBlockPos.z, CHUNKSIZE)
+            };
+
+            int localX = (globalBlockPos.x % CHUNKSIZE + CHUNKSIZE) % CHUNKSIZE;
+            int localZ = (globalBlockPos.z % CHUNKSIZE + CHUNKSIZE) % CHUNKSIZE;
+
+            glm::ivec3 localBlockPos = { localX, globalBlockPos.y, localZ };
+
+            auto targetChunkIt = mChunks.find(targetChunkCoords);
+            if (targetChunkIt != mChunks.end()) {
+                targetChunkIt->second.updateBlock(localBlockPos, blockPair.second);
+                targetChunkIt->second.setNeedRemeshStatus(true);
+            }
         }
+
+        blockMap->clear();
     }
+
+   
 }
 

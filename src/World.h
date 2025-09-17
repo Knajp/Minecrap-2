@@ -101,6 +101,8 @@ public:
 	ChunkData(const ChunkData&);
 	ChunkData& operator=(const ChunkData&);
 
+	ChunkData(ChunkData&& other) noexcept;
+
 	bool allocateChunkData(glm::ivec2 chunkCoords);
 	uint8_t* getData();
 	bool isFaceVisible(glm::ivec3 blockPos, BLOCKFACE face);
@@ -113,7 +115,7 @@ public:
 	void generateGrass(glm::ivec2 chunkCoords);
 	unsigned int airBlockCount;
 	unsigned int transparentBlockCount;
-	std::unordered_map <glm::ivec3, BLOCKTYPE> mMissingBlocks;
+	std::unordered_map <glm::ivec3, BLOCKTYPE>  mMissingBlocks;
 
 private:
 	uint8_t* pData;
@@ -143,8 +145,11 @@ public:
 	bool hasGPUbuffers() const;
 	inline static std::unordered_set<BLOCKTYPE> billboards = { TALLGRASS, REDFLOWER, PURPLEFLOWER };
 	inline static std::unordered_set<BLOCKTYPE> transparentBlocks = { TALLGRASS, REDFLOWER, PURPLEFLOWER, LEAVES };
-	bool hasMissingBlocks();
 	std::unordered_map<glm::ivec3, BLOCKTYPE>* getMissingBlocks();
+	void updateBlock(glm::ivec3 blockCoords, BLOCKTYPE bType);
+
+	bool getNeedRemeshStatus() const;
+	void setNeedRemeshStatus(bool nr);
 private:
 	std::vector<Vertex> mMeshVertices;
 	std::vector<uint16_t> mMeshIndices;
@@ -166,6 +171,7 @@ private:
 	VkBuffer mTransparentIndexBuffer;
 	VkDeviceMemory mTransparentIndexBufferMemory;
 
+	bool needRemesh = false;
 	bool pendingDeletion = false;
 
 };
@@ -192,6 +198,6 @@ public:
 private:
 	std::unordered_map<glm::ivec2, Chunk> mChunks; 
 	std::array<ChunkFreeList, MAX_FRAMES_IN_FLIGHT> mAwaitngDestruction;
-	const uint8_t renderDistance = 3;
+	const uint8_t renderDistance = 0;
 	
 };
