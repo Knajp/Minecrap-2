@@ -13,7 +13,7 @@ constexpr unsigned short int CHUNKHEIGHT = 64;
 constexpr uint8_t MAX_FRAMES_IN_FLIGHT = 3;
 
 enum BLOCKTYPE {
-	AIR, GRASS, DIRT, STONE, WOOD, LEAVES, TALLGRASS, REDFLOWER, PURPLEFLOWER
+	AIR, GRASS, DIRT, STONE, WOOD, LEAVES, TALLGRASS, REDFLOWER, PURPLEFLOWER, DEBUGBLOCK
 };
 enum BLOCKFACE {
 	FRONT, BACK, RIGHT, LEFT, TOP, BOTTOM
@@ -87,6 +87,8 @@ static uint8_t getBlockTextureIndex(BLOCKTYPE bType, BLOCKFACE bFace)
 		return 8;
 	case PURPLEFLOWER:
 		return 9;
+	case DEBUGBLOCK:
+		return 10;
 	default:
 		return 99;
 	}
@@ -98,10 +100,11 @@ public:
 	ChunkData(glm::ivec2 chunkCoords);
 	~ChunkData();
 
-	ChunkData(const ChunkData&);
-	ChunkData& operator=(const ChunkData&);
+	ChunkData(const ChunkData&) = delete;
+	ChunkData& operator=(const ChunkData&) = delete;
 
-	ChunkData(ChunkData&& other) noexcept;
+	ChunkData(ChunkData&&) noexcept = default;
+	ChunkData& operator=(ChunkData&&) noexcept = default;
 
 	bool allocateChunkData(glm::ivec2 chunkCoords);
 	uint8_t* getData();
@@ -115,10 +118,10 @@ public:
 	void generateGrass(glm::ivec2 chunkCoords);
 	unsigned int airBlockCount;
 	unsigned int transparentBlockCount;
-	std::unordered_map <glm::ivec3, BLOCKTYPE>  mMissingBlocks;
+	std::unique_ptr<std::unordered_map<glm::ivec3, BLOCKTYPE>> mMissingBlocks;
 
 private:
-	uint8_t* pData;
+	std::unique_ptr<uint8_t[]> pData;
 };
 
 class Chunk
@@ -198,6 +201,6 @@ public:
 private:
 	std::unordered_map<glm::ivec2, Chunk> mChunks; 
 	std::array<ChunkFreeList, MAX_FRAMES_IN_FLIGHT> mAwaitngDestruction;
-	const uint8_t renderDistance = 0;
+	const uint8_t renderDistance = 3;
 	
 };

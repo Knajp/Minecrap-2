@@ -69,6 +69,13 @@ void Chunk::generateMesh()
     std::vector<uint16_t>* targetIndexVector;
 
     uint32_t solidBlockCount = 16328 - mData.airBlockCount - mData.transparentBlockCount;
+
+
+    mMeshVertices.clear();
+    mMeshIndices.clear();
+    mTransparentMeshVertices.clear();
+    mTransparentMeshIndices.clear();
+    
     mMeshVertices.reserve(solidBlockCount / 2 * 32);
     mMeshIndices.reserve(solidBlockCount * 36);
 
@@ -82,7 +89,6 @@ void Chunk::generateMesh()
             
             BLOCKTYPE bType = (BLOCKTYPE)data[static_cast<int>(x * CHUNKHEIGHT * CHUNKSIZE + y * CHUNKSIZE + z)];
             if (bType == AIR) continue;
-
             uint8_t frontTexture = getBlockTextureIndex(bType, BLOCKFACE::FRONT);
             uint8_t backTexture = getBlockTextureIndex(bType, BLOCKFACE::BACK);
             uint8_t leftTexture = getBlockTextureIndex(bType, BLOCKFACE::LEFT);
@@ -135,6 +141,7 @@ void Chunk::generateMesh()
                     targetVertexVector->push_back(Vertex{ glm::vec3(x, y, z), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((frontTexture % 10) * 0.1f, (frontTexture / 10) * 0.1f) });
                     targetVertexVector->push_back(Vertex{ glm::vec3(x + 1.0f,  y, z), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((frontTexture % 10) * 0.1f + 0.1f, (frontTexture / 10) * 0.1f) });
                     targetVertexVector->push_back(Vertex{ glm::vec3(x + 1.0f,  y + 1.0f, z), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2((frontTexture % 10) * 0.1f + 0.1f, (frontTexture / 10) * 0.1f + 0.1f) });
+
 
                     const size_t count = Indices.size();
                     const size_t offset = targetIndexVector->size();
@@ -261,15 +268,48 @@ void Chunk::generateMesh()
 
 void Chunk::createGPUBuffers()
 {
+    // Destroy old opaque buffers if they exist
+    if (mVertexBuffer != VK_NULL_HANDLE) {
+        vkDestroyBuffer(GraphicsEngine::getDevice(), mVertexBuffer, nullptr);
+        vkFreeMemory(GraphicsEngine::getDevice(), mVertexBufferMemory, nullptr);
+        mVertexBuffer = VK_NULL_HANDLE;
+        mVertexBufferMemory = VK_NULL_HANDLE;
+    }
+
+    if (mIndexBuffer != VK_NULL_HANDLE) {
+        vkDestroyBuffer(GraphicsEngine::getDevice(), mIndexBuffer, nullptr);
+        vkFreeMemory(GraphicsEngine::getDevice(), mIndexBufferMemory, nullptr);
+        mIndexBuffer = VK_NULL_HANDLE;
+        mIndexBufferMemory = VK_NULL_HANDLE;
+    }
+
+    // Create new opaque buffers
     GraphicsEngine::createVertexBuffer(mMeshVertices, mVertexBuffer, mVertexBufferMemory);
     GraphicsEngine::createIndexBuffer(mMeshIndices, mIndexBuffer, mIndexBufferMemory);
 
+    // Destroy old transparent buffers if they exist
     if (!mTransparentMeshVertices.empty())
     {
+        if (mTransparentVertexBuffer != VK_NULL_HANDLE) {
+            vkDestroyBuffer(GraphicsEngine::getDevice(), mTransparentVertexBuffer, nullptr);
+            vkFreeMemory(GraphicsEngine::getDevice(), mTransparentVertexBuffferMemory, nullptr);
+            mTransparentVertexBuffer = VK_NULL_HANDLE;
+            mTransparentVertexBuffferMemory = VK_NULL_HANDLE;
+        }
+
+        if (mTransparentIndexBuffer != VK_NULL_HANDLE) {
+            vkDestroyBuffer(GraphicsEngine::getDevice(), mTransparentIndexBuffer, nullptr);
+            vkFreeMemory(GraphicsEngine::getDevice(), mTransparentIndexBufferMemory, nullptr);
+            mTransparentIndexBuffer = VK_NULL_HANDLE;
+            mTransparentIndexBufferMemory = VK_NULL_HANDLE;
+        }
+
+        // Create new transparent buffers
         GraphicsEngine::createVertexBuffer(mTransparentMeshVertices, mTransparentVertexBuffer, mTransparentVertexBuffferMemory);
         GraphicsEngine::createIndexBuffer(mTransparentMeshIndices, mTransparentIndexBuffer, mTransparentIndexBufferMemory);
     }
 }
+
 
 void Chunk::Render(VkCommandBuffer commandBuffer) const
 {
@@ -334,58 +374,14 @@ bool Chunk::hasGPUbuffers() const
 
 ChunkData::ChunkData(glm::ivec2 chunkCoords)
 {
-    pData = new uint8_t[CHUNKSIZE * CHUNKHEIGHT * CHUNKSIZE];
+    pData = std::make_unique<uint8_t[]>(CHUNKSIZE * CHUNKHEIGHT * CHUNKSIZE);
+    mMissingBlocks = std::make_unique<std::unordered_map<glm::ivec3, BLOCKTYPE>>();
+
     allocateChunkData(chunkCoords);
 }
 
 ChunkData::~ChunkData()
 {
-    delete[] pData; 
-}
-
-ChunkData::ChunkData(const ChunkData& other)
-    : airBlockCount(other.airBlockCount), transparentBlockCount(other.transparentBlockCount)
-{
-    if (other.pData) {
-        pData = new uint8_t[CHUNKSIZE * CHUNKSIZE * CHUNKHEIGHT];
-        std::copy(other.pData, other.pData + CHUNKSIZE * CHUNKSIZE * CHUNKHEIGHT, pData);
-    }
-    else {
-        pData = nullptr;
-    }
-}
-
-ChunkData& ChunkData::operator=(const ChunkData& other)
-{
-    if (this == &other)
-        return *this;
-
-    airBlockCount = other.airBlockCount;
-    transparentBlockCount = other.transparentBlockCount;
-
-    if (other.pData) {
-        if (!pData) {
-            pData = new uint8_t[CHUNKSIZE * CHUNKSIZE * CHUNKHEIGHT];
-        }
-        std::copy(other.pData, other.pData + CHUNKSIZE * CHUNKSIZE * CHUNKHEIGHT, pData);
-    }
-    else {
-        delete[] pData;
-        pData = nullptr;
-    }
-
-    return *this;
-}
-
-ChunkData::ChunkData(ChunkData&& other) noexcept
-    : pData(other.pData),
-    airBlockCount(other.airBlockCount),
-    transparentBlockCount(other.transparentBlockCount),
-    mMissingBlocks(std::move(other.mMissingBlocks))
-{
-    other.pData = nullptr;
-    other.airBlockCount = 0;
-    other.transparentBlockCount = 0;
 }
 
 bool ChunkData::allocateChunkData(glm::ivec2 chunkCoords)
@@ -425,14 +421,12 @@ bool ChunkData::allocateChunkData(glm::ivec2 chunkCoords)
     generateGrass(chunkCoords);
     generateTrees(chunkCoords);
 
-    std::unordered_map<glm::ivec3, BLOCKTYPE>* address = &mMissingBlocks;
-    std::cout << address << "\n";
     return true;
 }
 
 uint8_t* ChunkData::getData()
 {
-    return pData;
+    return pData.get();
 }
 
 bool ChunkData::isFaceVisible(glm::ivec3 blockPos, BLOCKFACE face)
@@ -532,7 +526,7 @@ void ChunkData::placeTree(glm::ivec3 baseCoords)
             {
                 idx = getBlockIndex({ baseCoords.x + x, baseCoords.y - y, baseCoords.z + z });
                 if (idx == -1)
-                    mMissingBlocks.emplace(std::make_pair(glm::ivec3(baseCoords.x + x, baseCoords.y - y, baseCoords.z + z), LEAVES));
+                    mMissingBlocks->emplace(std::make_pair(glm::ivec3(baseCoords.x + x, baseCoords.y - y, baseCoords.z + z), DEBUGBLOCK));
 
                 else if (y == 6 && abs(x) + abs(z) == 1)
                     pData[idx] = LEAVES;
@@ -620,15 +614,19 @@ void ChunkData::generateGrass(glm::ivec2 chunkCoords)
 
 std::unordered_map<glm::ivec3, BLOCKTYPE>* Chunk::getMissingBlocks()
 {
-    return &mData.mMissingBlocks;
+    return mData.mMissingBlocks.get();
 }
 
 void Chunk::updateBlock(glm::ivec3 blockCoords, BLOCKTYPE bType)
 {
-    mData.getData()[mData.getBlockIndex(blockCoords)] = bType;
-    if (transparentBlocks.count(bType) != 0) mData.transparentBlockCount++;
-
-    std::cout << "Block update!\n";
+    int idx = mData.getBlockIndex(blockCoords);
+    if (idx != -1)
+    {
+        mData.getData()[idx] = bType;
+        if (transparentBlocks.count(bType) != 0) mData.transparentBlockCount++;
+        std::cout << "Block update at: X: " << blockCoords.x << " Y: " << blockCoords.y << " Z: " << blockCoords.z << "\n";
+    }
+    
 }
 
 bool Chunk::getNeedRemeshStatus() const
@@ -673,7 +671,11 @@ void Planet::Update(glm::vec2 playerPosition, uint32_t currentFrame)
     lastChunk = { chunkX, chunkY };
 
     for (auto& chunk : mChunks)
-        if (chunk.second.getNeedRemeshStatus()) chunk.second.generateMesh();
+        if (chunk.second.getNeedRemeshStatus())
+        {
+            chunk.second.generateMesh();
+            chunk.second.createGPUBuffers();
+        }
 
 }
 
@@ -784,7 +786,6 @@ void Planet::fillMissingBlocks()
     for (auto& chunkPair : mChunks)
     {
         std::unordered_map<glm::ivec3, BLOCKTYPE>* blockMap = chunkPair.second.getMissingBlocks();
-        std::cout << blockMap << "\n";
         if (blockMap->empty()) continue;
         for (auto& blockPair : *blockMap)
         {
