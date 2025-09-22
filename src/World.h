@@ -49,7 +49,7 @@ namespace std {
 
 
 
-static uint8_t getBlockTextureIndex(BLOCKTYPE bType, BLOCKFACE bFace)
+constexpr static uint8_t getBlockTextureIndex(BLOCKTYPE bType, BLOCKFACE bFace)
 {
 	switch (bType)
 	{
@@ -201,6 +201,6 @@ public:
 private:
 	std::unordered_map<glm::ivec2, Chunk> mChunks; 
 	std::array<ChunkFreeList, MAX_FRAMES_IN_FLIGHT> mAwaitngDestruction;
-	const uint8_t renderDistance = 3;
+	const uint8_t renderDistance = 10;
 	
 };

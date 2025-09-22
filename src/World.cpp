@@ -83,11 +83,11 @@ void Chunk::generateMesh()
     mTransparentMeshIndices.reserve(mData.transparentBlockCount * 36);
 
     for(int x = 0; x < CHUNKSIZE; x++)
-        for (int y = 0; y < CHUNKHEIGHT; y++)
         for (int z = 0; z < CHUNKSIZE; z++)
+        for (int y = 0; y < CHUNKHEIGHT; y++)
         {
             
-            BLOCKTYPE bType = (BLOCKTYPE)data[static_cast<int>(x * CHUNKHEIGHT * CHUNKSIZE + y * CHUNKSIZE + z)];
+            BLOCKTYPE bType = (BLOCKTYPE)data[static_cast<int>(x * CHUNKHEIGHT * CHUNKSIZE + z * CHUNKHEIGHT + y)];
             if (bType == AIR) continue;
             uint8_t frontTexture = getBlockTextureIndex(bType, BLOCKFACE::FRONT);
             uint8_t backTexture = getBlockTextureIndex(bType, BLOCKFACE::BACK);
@@ -263,7 +263,6 @@ void Chunk::generateMesh()
             }
         }
     
-        setNeedRemeshStatus(false);
 }
 
 void Chunk::createGPUBuffers()
@@ -390,34 +389,62 @@ bool ChunkData::allocateChunkData(glm::ivec2 chunkCoords)
     static int octaves = 6;
     static float persistance = 0.48f;
 
-    
-    static siv::BasicPerlinNoise<float> noise(static_cast<uint32_t>(glfwGetTime() * 1000));
+    static uint32_t seed = glfwGetTime() * 1000;
+
+    std::mutex airBlockMutex;
+    unsigned maxThreads = std::max(1u, std::thread::hardware_concurrency());
+    std::vector<std::future<void>> futures;
+
     for (size_t x = 0; x < CHUNKSIZE; x++)
-        for (size_t y = 0; y < CHUNKHEIGHT; y++)
-            for (size_t z = 0; z < CHUNKSIZE; z++)
-            {
+        for (size_t z = 0; z < CHUNKSIZE; z++)
+        {
+            futures.emplace_back(std::async(std::launch::async, [this, &chunkCoords, x, z, &airBlockMutex] {
+
                 int64_t globalX = (uint64_t)chunkCoords.x * CHUNKSIZE + x;
                 int64_t globalZ = (uint64_t)chunkCoords.y * CHUNKSIZE + z;
 
                 float nx = globalX * scale;
                 float nz = globalZ * scale;
 
+                siv::BasicPerlinNoise<float> noise(seed);
+
                 double n = noise.normalizedOctave2D_01(nx, nz, octaves, persistance);
 
                 uint16_t height = static_cast<uint16_t>(CHUNKHEIGHT * n);
-                
-                if (y < height)
+
+                for (size_t y = 0; y < CHUNKHEIGHT; y++)
                 {
-                    pData[x * CHUNKHEIGHT * CHUNKSIZE + y * CHUNKSIZE + z] = BLOCKTYPE::AIR;
-                    airBlockCount++;
+                    if (y < height)
+                    {
+                        pData[x * CHUNKHEIGHT * CHUNKSIZE + z * CHUNKHEIGHT + y] = BLOCKTYPE::AIR;
+
+                        {
+                            std::lock_guard<std::mutex> lock(airBlockMutex);
+                            airBlockCount++;
+                        }
+                        
+                    }
+                    else if (y == height)
+                        pData[x * CHUNKHEIGHT * CHUNKSIZE + z * CHUNKHEIGHT + y] = BLOCKTYPE::GRASS;        // surface
+                    else if (y <= (size_t)height + 5)
+                        pData[x * CHUNKHEIGHT * CHUNKSIZE + z * CHUNKHEIGHT + y] = BLOCKTYPE::DIRT;         // top layers below surface
+                    else
+                        pData[x * CHUNKHEIGHT * CHUNKSIZE + z * CHUNKHEIGHT + y] = BLOCKTYPE::STONE;
                 }
-                else if (y == height)
-                    pData[x * CHUNKHEIGHT * CHUNKSIZE + y * CHUNKSIZE + z] = BLOCKTYPE::GRASS;        // surface
-                else if (y <= (size_t)height + 5)
-                    pData[x * CHUNKHEIGHT * CHUNKSIZE + y * CHUNKSIZE + z] = BLOCKTYPE::DIRT;         // top layers below surface
-                else
-                    pData[x * CHUNKHEIGHT * CHUNKSIZE + y * CHUNKSIZE + z] = BLOCKTYPE::STONE;
+                }));
+
+            if (futures.size() >= maxThreads)
+            {
+                for (auto& f : futures)
+                    f.get();
+                futures.clear();
             }
+            
+        }
+    
+    for (auto& f : futures)
+        f.get();
+
     generateGrass(chunkCoords);
     generateTrees(chunkCoords);
 
@@ -481,7 +508,7 @@ int ChunkData::getBlockIndex(glm::ivec3 blockCoords)
 {
     if (blockCoords.x >= CHUNKSIZE || blockCoords.x < 0 || blockCoords.y >= CHUNKHEIGHT || blockCoords.y < 0 || blockCoords.z >= CHUNKSIZE || blockCoords.z < 0)
         return -1;
-    return blockCoords.x * CHUNKHEIGHT * CHUNKSIZE + blockCoords.y * CHUNKSIZE + blockCoords.z;
+    return blockCoords.x * CHUNKHEIGHT * CHUNKSIZE + blockCoords.z * CHUNKHEIGHT + blockCoords.y;
 }
 
 void ChunkData::generateTrees(glm::ivec2 chunkCoords)
@@ -525,20 +552,27 @@ void ChunkData::placeTree(glm::ivec3 baseCoords)
             for (int z = -2; z <= 2; z++)
             {
                 idx = getBlockIndex({ baseCoords.x + x, baseCoords.y - y, baseCoords.z + z });
-                if (idx == -1)
-                    mMissingBlocks->emplace(std::make_pair(glm::ivec3(baseCoords.x + x, baseCoords.y - y, baseCoords.z + z), DEBUGBLOCK));
 
-                else if (y == 6 && abs(x) + abs(z) == 1)
-                    pData[idx] = LEAVES;
-
+                if (y == 6 && abs(x) + abs(z) == 1)
+                {
+                    if (idx != -1) pData[idx] = LEAVES;
+                    else mMissingBlocks->emplace(std::make_pair(glm::ivec3(baseCoords.x + x, baseCoords.y - y, baseCoords.z + z), LEAVES));
+                }
                 else if (y == 5 && abs(x) < 2 && abs(z) < 2)
-                    pData[idx] = LEAVES;
-
+                {
+                    if (idx != -1) pData[idx] = LEAVES;
+                    else mMissingBlocks->emplace(std::make_pair(glm::ivec3(baseCoords.x + x, baseCoords.y - y, baseCoords.z + z), LEAVES));
+                }
                 else if (y == 4 && abs(x) + abs(z) != 4)
-                    pData[idx] = LEAVES;
-
+                {
+                    if (idx != -1) pData[idx] = LEAVES;
+                    else mMissingBlocks->emplace(std::make_pair(glm::ivec3(baseCoords.x + x, baseCoords.y - y, baseCoords.z + z), LEAVES));
+                }
                 else if (y == 3)
-                    pData[idx] = LEAVES;
+                {
+                    if (idx != -1) pData[idx] = LEAVES;
+                    else mMissingBlocks->emplace(std::make_pair(glm::ivec3(baseCoords.x + x, baseCoords.y - y, baseCoords.z + z), LEAVES));
+                }
 
 
             }
@@ -624,7 +658,6 @@ void Chunk::updateBlock(glm::ivec3 blockCoords, BLOCKTYPE bType)
     {
         mData.getData()[idx] = bType;
         if (transparentBlocks.count(bType) != 0) mData.transparentBlockCount++;
-        std::cout << "Block update at: X: " << blockCoords.x << " Y: " << blockCoords.y << " Z: " << blockCoords.z << "\n";
     }
     
 }
@@ -670,12 +703,34 @@ void Planet::Update(glm::vec2 playerPosition, uint32_t currentFrame)
 
     lastChunk = { chunkX, chunkY };
 
+    unsigned maxThreads = std::max(1u, std::thread::hardware_concurrency());
+    std::vector<std::future<void>> futures;
+
     for (auto& chunk : mChunks)
-        if (chunk.second.getNeedRemeshStatus())
-        {
+    {
+        if (!chunk.second.getNeedRemeshStatus()) continue;
+
+        futures.emplace_back(std::async(std::launch::async, [this, &chunk] {
             chunk.second.generateMesh();
-            chunk.second.createGPUBuffers();
+            }));
+
+        if (futures.size() >= maxThreads)
+        {
+            for (auto& f : futures)
+                f.get();
+            futures.clear();
         }
+    }
+
+    for (auto& f : futures)
+        f.get();
+
+    for (auto& chunk : mChunks)
+    {
+        if (!chunk.second.getNeedRemeshStatus()) continue;
+        chunk.second.createGPUBuffers();
+        chunk.second.setNeedRemeshStatus(false);
+    }
 
 }
 
@@ -787,26 +842,29 @@ void Planet::fillMissingBlocks()
     {
         std::unordered_map<glm::ivec3, BLOCKTYPE>* blockMap = chunkPair.second.getMissingBlocks();
         if (blockMap->empty()) continue;
+
+        bool needsRemesh = false;
         for (auto& blockPair : *blockMap)
         {
-            glm::ivec3 globalBlockPos = glm::ivec3(chunkPair.first.x * CHUNKSIZE, blockPair.first.y, chunkPair.first.y * CHUNKSIZE) + blockPair.first;
+            glm::ivec3 globalBlockPos = glm::ivec3(chunkPair.first.x * CHUNKSIZE, 0, chunkPair.first.y * CHUNKSIZE) + blockPair.first;
 
             glm::ivec2 targetChunkCoords = {
                 floorDiv(globalBlockPos.x, CHUNKSIZE),
                 floorDiv(globalBlockPos.z, CHUNKSIZE)
             };
 
-            int localX = (globalBlockPos.x % CHUNKSIZE + CHUNKSIZE) % CHUNKSIZE;
-            int localZ = (globalBlockPos.z % CHUNKSIZE + CHUNKSIZE) % CHUNKSIZE;
+            int localX = globalBlockPos.x - targetChunkCoords.x * CHUNKSIZE;
+            int localZ = globalBlockPos.z - targetChunkCoords.y * CHUNKSIZE;
 
             glm::ivec3 localBlockPos = { localX, globalBlockPos.y, localZ };
 
             auto targetChunkIt = mChunks.find(targetChunkCoords);
             if (targetChunkIt != mChunks.end()) {
                 targetChunkIt->second.updateBlock(localBlockPos, blockPair.second);
-                targetChunkIt->second.setNeedRemeshStatus(true);
+                needsRemesh = true;
             }
         }
+        if (needsRemesh) chunkPair.second.setNeedRemeshStatus(true);
 
         blockMap->clear();
     }
