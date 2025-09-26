@@ -10,8 +10,9 @@
 #include <chrono>
 
 Chunk::Chunk(glm::ivec2 aWorldPos)
-    :mWorldPosition(aWorldPos), mData(aWorldPos)
+    :mWorldPosition(aWorldPos), mData(aWorldPos), boundingBox(aWorldPos)
 {
+    
     generateMesh();
 }
 
@@ -672,6 +673,12 @@ void Chunk::setNeedRemeshStatus(bool nr)
     needRemesh = nr;
 }
 
+AABB Chunk::getBoundingBox() const
+{
+    std::cout << boundingBox.max.x << " " << boundingBox.max.y << "\n";
+    return boundingBox;
+}
+
 Planet::Planet()
 {
     srand(static_cast<uint32_t>(glfwGetTime()));
@@ -804,19 +811,23 @@ void Planet::onPlayerCrossedChunk(glm::ivec2 plrChunk, uint32_t currentFrame)
 
 }
 
-void Planet::Render(VkCommandBuffer commandBuffer, VkPipelineLayout& layout)
+void Planet::Render(VkCommandBuffer commandBuffer, VkPipelineLayout& layout, Camera& cam)
 {
     std::cout << mChunks.size() << "\n";
+    unsigned int counter = 0;
     for (const auto& chunk : mChunks)
     {
-        if (chunk.second.isPendingDeletion())
+        if (chunk.second.isPendingDeletion() || !cam.AABBIntersectsFrustum(chunk.second.getBoundingBox()))
             continue;
-        
+
+        counter++;
+
         PushConstants pConsts{};
         pConsts.model = glm::translate(glm::mat4(1.0f), glm::vec3(chunk.first.x * CHUNKSIZE, 0.0f, chunk.first.y * CHUNKSIZE));
         vkCmdPushConstants(commandBuffer, layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstants), &pConsts);
         chunk.second.Render(commandBuffer);
     }
+    std::cout << "Rendered: " << counter << "\n";
 }
 
 void Planet::Cleanup(uint32_t currentFrame, VkDevice& device)

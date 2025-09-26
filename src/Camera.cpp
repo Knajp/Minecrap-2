@@ -92,6 +92,33 @@ glm::vec3 Camera::getPosition() const
 	return mPosition;
 }
 
+bool Camera::AABBIntersectsFrustum(AABB boundingBox)
+{
+	static AABB oldBB;
+
+	oldBB = boundingBox;
+	for (const auto& plane : frustumPlanes)
+	{
+		glm::vec3 pVertex = boundingBox.min;
+
+		if (plane.normal.x >= 0)
+			pVertex.x = boundingBox.max.x;
+		if (plane.normal.y >= 0)
+			pVertex.y = boundingBox.max.y;
+		if (plane.normal.z >= 0)
+			pVertex.z = boundingBox.max.z;
+
+		auto distance = plane.distance(pVertex);
+		if (distance < 0)
+		{
+			std::cout << "no intersect\n";
+			return false;
+		}
+			
+	}
+	return true;
+}
+
 Camera::Camera()
 	:mOrientation(glm::vec3(1.0f, 0.0f, 0.0f)), mPosition(glm::vec3(3.0f, -2.0f, -2.0f)), mUp(glm::vec3(0.0f, 1.0f, 0.0f)), mFacing(mOrientation)
 {

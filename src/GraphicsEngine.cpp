@@ -1271,7 +1271,7 @@ void GraphicsEngine::recordCommandBuffer(VkCommandBuffer buffer, uint32_t imageI
 
 	vkCmdBindDescriptorSets(buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_PipelineLayout, 0, 1, &m_DescriptorSets[currentFrame], 0, nullptr);
 
-	mPlanet.Render(buffer, m_PipelineLayout);
+	mPlanet.Render(buffer, m_PipelineLayout, mCamera);
 	
 	vkCmdEndRenderPass(buffer);
 

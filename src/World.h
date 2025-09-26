@@ -7,6 +7,8 @@
 #include <functional>
 #include <iostream>
 #include <unordered_set>
+#include "Camera.h"
+
 constexpr unsigned short int CHUNKSIZE = 16;
 constexpr unsigned short int CHUNKHEIGHT = 64;
 
@@ -153,6 +155,8 @@ public:
 
 	bool getNeedRemeshStatus() const;
 	void setNeedRemeshStatus(bool nr);
+
+	AABB getBoundingBox() const;
 private:
 	std::vector<Vertex> mMeshVertices;
 	std::vector<uint16_t> mMeshIndices;
@@ -177,6 +181,7 @@ private:
 	bool needRemesh = false;
 	bool pendingDeletion = false;
 
+	AABB boundingBox;
 };
 
 struct ChunkFreeList
@@ -195,7 +200,7 @@ public:
 	void prepareForDestruction(); // very funny name
 	void Update(glm::vec2 playerPosition, uint32_t currentFrame);
 	void onPlayerCrossedChunk(glm::ivec2 plrChunk, uint32_t currentFrame);
-	void Render(VkCommandBuffer commandBuffer, VkPipelineLayout& layout);
+	void Render(VkCommandBuffer commandBuffer, VkPipelineLayout& layout, Camera& cam);
 	void Cleanup(uint32_t currentFrame, VkDevice& device);
 	void fillMissingBlocks();
 private:

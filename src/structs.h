@@ -49,3 +49,31 @@ struct PushConstants
 {
 	glm::mat4 model;
 };
+
+struct Plane
+{
+	glm::vec3 normal;
+	float d;
+
+	float distance(const glm::vec3& point) const
+	{
+		return glm::dot(normal, point) + d;
+	}
+};
+
+struct AABB
+{
+	AABB() = default;
+	AABB(glm::ivec2 chunkCoords)
+	{
+		min = { chunkCoords.x * 16, -64, chunkCoords.y * 16 };
+		max = { (chunkCoords.x + 1) * 16, 64, (chunkCoords.y + 1) * 16 };
+	}
+
+	bool operator==(AABB& other)
+	{
+		return min == other.min && max == other.max;
+	}
+	glm::vec3 min;
+	glm::vec3 max;
+};
