@@ -201,6 +201,6 @@ public:
 private:
 	std::unordered_map<glm::ivec2, Chunk> mChunks; 
 	std::array<ChunkFreeList, MAX_FRAMES_IN_FLIGHT> mAwaitngDestruction;
-	const uint8_t renderDistance = 10;
+	const uint8_t renderDistance = 3;
 	
 };

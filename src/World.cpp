@@ -806,6 +806,7 @@ void Planet::onPlayerCrossedChunk(glm::ivec2 plrChunk, uint32_t currentFrame)
 
 void Planet::Render(VkCommandBuffer commandBuffer, VkPipelineLayout& layout)
 {
+    std::cout << mChunks.size() << "\n";
     for (const auto& chunk : mChunks)
     {
         if (chunk.second.isPendingDeletion())

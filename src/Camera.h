@@ -4,6 +4,18 @@
 #include "structs.h"
 #include <GLFW/glfw3.h>
 
+struct Plane
+{
+	glm::vec3 normal;
+	float d;
+
+	float distance(const glm::vec3& point) const
+	{
+		return glm::dot(normal, point) + d;
+	}
+};
+
+
 class Camera
 {
 public:
@@ -29,4 +41,8 @@ private:
 	MVP mMatrices;
 
 	float mRange = 5.0f;
+
+	float mFOV = 90.0f;
+
+	std::array<Plane, 2> frustumPlanes;
 };

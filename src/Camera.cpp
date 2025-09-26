@@ -67,6 +67,19 @@ void Camera::processInput(GLFWwindow* window, float deltaTime)
 			//glm::ivec2 chunkCoord = {intCoord.x / 16}
 		}
 	}
+
+	// frustum calc
+
+	glm::vec3 leftVec = glm::rotateY(mFacing, glm::radians(mFOV / 2));
+	glm::vec3 rightVec = glm::rotateY(mFacing, glm::radians(-mFOV / 2));
+
+	glm::vec3 leftNormal = glm::normalize(glm::cross(mUp, leftVec));
+	glm::vec3 rightNormal = glm::normalize(glm::cross(rightVec, mUp));
+
+	Plane leftPlane = { leftNormal, -glm::dot(leftNormal, mPosition) };
+	Plane rightPlane = { rightNormal, -glm::dot(rightNormal, mPosition) };
+
+	frustumPlanes = { leftPlane, rightPlane };
 }
 
 void Camera::modifyAspectRatio(float newAR)
@@ -83,6 +96,6 @@ Camera::Camera()
 	:mOrientation(glm::vec3(1.0f, 0.0f, 0.0f)), mPosition(glm::vec3(3.0f, -2.0f, -2.0f)), mUp(glm::vec3(0.0f, 1.0f, 0.0f)), mFacing(mOrientation)
 {
 
-	mMatrices.proj = glm::perspective(glm::radians(45.0f), 1.0f, 0.1f, 1000.0f);
+	mMatrices.proj = glm::perspective(glm::radians(mFOV), 1.0f, 0.1f, 1000.0f);
 	mMatrices.view = glm::lookAt(mPosition, mPosition + mOrientation, mUp);
 }
