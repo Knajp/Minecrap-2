@@ -156,7 +156,7 @@ public:
 	bool getNeedRemeshStatus() const;
 	void setNeedRemeshStatus(bool nr);
 
-	AABB getBoundingBox() const;
+	const AABB* getBoundingBox() const;
 private:
 	std::vector<Vertex> mMeshVertices;
 	std::vector<uint16_t> mMeshIndices;
@@ -181,7 +181,7 @@ private:
 	bool needRemesh = false;
 	bool pendingDeletion = false;
 
-	AABB boundingBox;
+	std::unique_ptr<AABB> boundingbox;
 };
 
 struct ChunkFreeList

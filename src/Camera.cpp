@@ -70,16 +70,41 @@ void Camera::processInput(GLFWwindow* window, float deltaTime)
 
 	// frustum calc
 
-	glm::vec3 leftVec = glm::rotateY(mFacing, glm::radians(mFOV / 2));
-	glm::vec3 rightVec = glm::rotateY(mFacing, glm::radians(-mFOV / 2));
+	glm::mat4 VP = mMatrices.proj * mMatrices.view;
 
-	glm::vec3 leftNormal = glm::normalize(glm::cross(mUp, leftVec));
-	glm::vec3 rightNormal = glm::normalize(glm::cross(rightVec, mUp));
+	// Left
+	frustumPlanes[0].normal.x = VP[0][3] + VP[0][0];
+	frustumPlanes[0].normal.y = VP[1][3] + VP[1][0];
+	frustumPlanes[0].normal.z = VP[2][3] + VP[2][0];
+	frustumPlanes[0].d = VP[3][3] + VP[3][0];
 
-	Plane leftPlane = { leftNormal, -glm::dot(leftNormal, mPosition) };
-	Plane rightPlane = { rightNormal, -glm::dot(rightNormal, mPosition) };
+	// Right
+	frustumPlanes[1].normal.x = VP[0][3] - VP[0][0];
+	frustumPlanes[1].normal.y = VP[1][3] - VP[1][0];
+	frustumPlanes[1].normal.z = VP[2][3] - VP[2][0];
+	frustumPlanes[1].d = VP[3][3] - VP[3][0];
 
-	frustumPlanes = { leftPlane, rightPlane };
+	// Bottom
+	frustumPlanes[2].normal.x = VP[0][3] + VP[0][1];
+	frustumPlanes[2].normal.y = VP[1][3] + VP[1][1];
+	frustumPlanes[2].normal.z = VP[2][3] + VP[2][1];
+	frustumPlanes[2].d = VP[3][3] + VP[3][1];
+
+	// Top
+	frustumPlanes[3].normal.x = VP[0][3] - VP[0][1];
+	frustumPlanes[3].normal.y = VP[1][3] - VP[1][1];
+	frustumPlanes[3].normal.z = VP[2][3] - VP[2][1];
+	frustumPlanes[3].d = VP[3][3] - VP[3][1];
+
+
+
+	// Normalize all planes
+	for (auto& plane : frustumPlanes)
+	{
+		float length = glm::length(plane.normal);
+		plane.normal /= length;
+		plane.d /= length;
+	}
 }
 
 void Camera::modifyAspectRatio(float newAR)
@@ -92,26 +117,23 @@ glm::vec3 Camera::getPosition() const
 	return mPosition;
 }
 
-bool Camera::AABBIntersectsFrustum(AABB boundingBox)
+bool Camera::AABBIntersectsFrustum(const AABB* boundingBox)
 {
-	static AABB oldBB;
 
-	oldBB = boundingBox;
 	for (const auto& plane : frustumPlanes)
 	{
-		glm::vec3 pVertex = boundingBox.min;
+		glm::vec3 pVertex = boundingBox->min;
 
 		if (plane.normal.x >= 0)
-			pVertex.x = boundingBox.max.x;
+			pVertex.x = boundingBox->max.x;
 		if (plane.normal.y >= 0)
-			pVertex.y = boundingBox.max.y;
+			pVertex.y = boundingBox->max.y;
 		if (plane.normal.z >= 0)
-			pVertex.z = boundingBox.max.z;
+			pVertex.z = boundingBox->max.z;
 
 		auto distance = plane.distance(pVertex);
 		if (distance < 0)
 		{
-			std::cout << "no intersect\n";
 			return false;
 		}
 			

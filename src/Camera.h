@@ -3,6 +3,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include "structs.h"
 #include <GLFW/glfw3.h>
+#include <memory>
 
 
 
@@ -19,7 +20,7 @@ public:
 	void modifyAspectRatio(float newAR);
 
 	glm::vec3 getPosition() const;
-	bool AABBIntersectsFrustum(AABB boundingBox);
+	bool AABBIntersectsFrustum(const AABB* boundingBox);
 private:
 
 	glm::vec3 mOrientation;
@@ -36,5 +37,5 @@ private:
 
 	float mFOV = 90.0f;
 
-	std::array<Plane, 2> frustumPlanes;
+	std::array<Plane, 4> frustumPlanes;
 };
