@@ -251,6 +251,23 @@ void GraphicsEngine::pickPhysicalDevice()
 	else throw std::runtime_error("Failed to find a suitable GPU!");
 }
 
+void GraphicsEngine::performOcclusionQuery(VkCommandBuffer& commandBuffer, unsigned int chunkCount)
+{
+	VkQueryPoolCreateInfo poolCreateInfo{};
+	poolCreateInfo.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
+	poolCreateInfo.queryType = VK_QUERY_TYPE_OCCLUSION;
+
+	VkQueryPool queryPool;
+	if (vkCreateQueryPool(m_Device, &poolCreateInfo, nullptr, &queryPool) != VK_SUCCESS)
+		throw std::runtime_error("Failed to create a query pool!");
+
+	vkCmdResetQueryPool(commandBuffer, queryPool, 0, chunkCount);
+
+	// for each chunk begin query, draw a bounding box (create aabb geometry beforehand), finish query
+	// in next frame get results
+	// then in the frame after that send results back to planet and cull
+}
+
 int GraphicsEngine::rateDeviceSuitability(const VkPhysicalDevice& device)
 {
 	int score = 0;

@@ -59,6 +59,7 @@ public:
 private:
 	GraphicsEngine() = default;
 	
+	void performOcclusionQuery(VkCommandBuffer& commandBuffer, unsigned int chunkCount);
 	int rateDeviceSuitability(const VkPhysicalDevice& device);
 	void createColorResources();
 	VkSampleCountFlagBits getMaxSampleCount();
