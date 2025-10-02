@@ -203,9 +203,11 @@ public:
 	void Render(VkCommandBuffer commandBuffer, VkPipelineLayout& layout, Camera& cam);
 	void Cleanup(uint32_t currentFrame, VkDevice& device);
 	void fillMissingBlocks();
+
+	static const uint8_t renderDistance = 4;
 private:
 	std::unordered_map<glm::ivec2, Chunk> mChunks; 
 	std::array<ChunkFreeList, MAX_FRAMES_IN_FLIGHT> mAwaitngDestruction;
-	const uint8_t renderDistance = 3;
+	
 	
 };

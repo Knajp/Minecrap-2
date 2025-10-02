@@ -59,7 +59,14 @@ public:
 private:
 	GraphicsEngine() = default;
 	
-	void performOcclusionQuery(VkCommandBuffer& commandBuffer, unsigned int chunkCount);
+	void createOcclusionQueryPool();
+	void createQueryFramebuffers();
+	void createQueryRenderPass();
+	void createQueryDescriptorSets();
+	void createQueryDescriptorPool();
+	void createQueryDescriptorSetLayout();
+	void createQueryPipeline();
+	void performOcclusionQuery(VkCommandBuffer& commandBuffer, unsigned int chunkCount, std::unordered_map<glm::ivec2, Chunk>& chunkMap);
 	int rateDeviceSuitability(const VkPhysicalDevice& device);
 	void createColorResources();
 	VkSampleCountFlagBits getMaxSampleCount();
@@ -173,6 +180,18 @@ private:
 	Planet mPlanet;
 
 	Camera mCamera;
+
+	VkQueryPool mOcclusionQueryPool;
+
+	VkPipelineLayout mQueryPipelineLayout;
+	VkPipeline mQueryPipeline;
+
+	VkDescriptorSetLayout mQueryDescLayout;
+	VkDescriptorPool mQueryDescPool;
+	std::vector<VkDescriptorSet> mQueryDescriptorSets;
+
+	VkRenderPass mQueryRenderPass;
+	std::vector<VkFramebuffer> mQueryFramebuffers;
 };
 
 static void framebufferResizeCallback(GLFWwindow* window, int width, int height)

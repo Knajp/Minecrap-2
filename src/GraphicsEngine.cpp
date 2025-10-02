@@ -67,6 +67,12 @@ void GraphicsEngine::IntializeGraphicsEngine()
 	createDescriptorSets();
 	createCommandBuffer();
 	createSyncObjects();
+	createQueryRenderPass();
+	createQueryDescriptorSetLayout();
+	createQueryPipeline();
+	createQueryDescriptorSets();
+	createQueryFramebuffers();
+	createOcclusionQueryPool();
 	mainLoop();
 	terminate();
 }
@@ -251,18 +257,297 @@ void GraphicsEngine::pickPhysicalDevice()
 	else throw std::runtime_error("Failed to find a suitable GPU!");
 }
 
-void GraphicsEngine::performOcclusionQuery(VkCommandBuffer& commandBuffer, unsigned int chunkCount)
+void GraphicsEngine::createOcclusionQueryPool()
 {
-	VkQueryPoolCreateInfo poolCreateInfo{};
-	poolCreateInfo.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
-	poolCreateInfo.queryType = VK_QUERY_TYPE_OCCLUSION;
+	VkQueryPoolCreateInfo createInfo{};
+	createInfo.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
+	createInfo.queryType = VK_QUERY_TYPE_OCCLUSION;
+	createInfo.queryCount = static_cast<uint32_t>((2 * Planet::renderDistance + 1) * (2 * Planet::renderDistance + 1));
 
-	VkQueryPool queryPool;
-	if (vkCreateQueryPool(m_Device, &poolCreateInfo, nullptr, &queryPool) != VK_SUCCESS)
-		throw std::runtime_error("Failed to create a query pool!");
+	if (vkCreateQueryPool(m_Device, &createInfo, nullptr, &mOcclusionQueryPool) != VK_SUCCESS)
+		throw std::runtime_error("Failed to create occlusion query pool!");
+}
 
-	vkCmdResetQueryPool(commandBuffer, queryPool, 0, chunkCount);
+void GraphicsEngine::createQueryFramebuffers()
+{
+	mQueryFramebuffers.resize(m_SwapchainImageViews.size());
 
+	for (size_t i = 0; i < m_SwapchainImageViews.size(); i++)
+	{
+		VkImageView attachments[] =
+		{
+			depthImageView
+		};
+
+		VkFramebufferCreateInfo createInfo{};
+		createInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+		createInfo.renderPass = mQueryRenderPass;
+		createInfo.attachmentCount = 1;
+		createInfo.pAttachments = attachments;
+		createInfo.width = m_SwapchainExtent.width;
+		createInfo.height = m_SwapchainExtent.height;
+		createInfo.layers = 1;
+
+		if (vkCreateFramebuffer(m_Device, &createInfo, nullptr, &mQueryFramebuffers[i]) != VK_SUCCESS)
+			throw std::runtime_error("Failed to create query framebuffer!");
+	}
+}; 
+
+void GraphicsEngine::createQueryRenderPass()
+{
+	VkAttachmentDescription attachmentDesc{};
+	attachmentDesc.format = findDepthFormat();
+	attachmentDesc.samples = VK_SAMPLE_COUNT_1_BIT;
+	attachmentDesc.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	attachmentDesc.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	attachmentDesc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	attachmentDesc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	attachmentDesc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	attachmentDesc.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+	VkAttachmentReference attachmentRef{};
+	attachmentRef.attachment = 0;
+	attachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+	VkSubpassDescription subpass{};
+	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+	subpass.colorAttachmentCount = 0;
+	subpass.pDepthStencilAttachment = &attachmentRef;
+
+	VkSubpassDependency dependency{};
+	dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+	dependency.dstSubpass = 0;
+	dependency.srcStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+	dependency.srcAccessMask = 0;
+	dependency.dstStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+	dependency.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+
+	VkRenderPassCreateInfo renderPassInfo{};
+	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+	renderPassInfo.attachmentCount = 1;
+	renderPassInfo.pAttachments = &attachmentDesc;
+	renderPassInfo.subpassCount = 1;
+	renderPassInfo.pSubpasses = &subpass;
+	renderPassInfo.dependencyCount = 1;
+	renderPassInfo.pDependencies = &dependency;
+
+	if (vkCreateRenderPass(m_Device, &renderPassInfo, nullptr, &mQueryRenderPass) != VK_SUCCESS)
+		throw std::runtime_error("Failed to create query render pass!");
+
+}
+
+void GraphicsEngine::createQueryDescriptorSets()
+{
+	std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, mQueryDescLayout);
+
+	VkDescriptorSetAllocateInfo allocInfo{};
+	allocInfo.descriptorPool = mQueryDescPool;
+	allocInfo.descriptorSetCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+	allocInfo.pSetLayouts = layouts.data();
+	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+
+	mQueryDescriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
+	if (vkAllocateDescriptorSets(m_Device, &allocInfo, mQueryDescriptorSets.data()) != VK_SUCCESS)
+		throw std::runtime_error("Failed to allocate desc sets!");
+
+	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+	{
+		VkDescriptorBufferInfo bufferInfo{};
+		bufferInfo.buffer = m_UniformBuffers[i];
+		bufferInfo.offset = 0;
+		bufferInfo.range = sizeof(MVP);
+
+		VkDescriptorImageInfo imageInfo{};
+		imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		imageInfo.imageView = textureImageView;
+		imageInfo.sampler = textureSampler;
+
+		VkWriteDescriptorSet writeInfo;
+
+		writeInfo.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writeInfo.dstSet = mQueryDescriptorSets[i];
+		writeInfo.dstBinding = 0;
+		writeInfo.dstArrayElement = 0;
+		writeInfo.descriptorCount = 1;
+		writeInfo.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		writeInfo.pBufferInfo = &bufferInfo;
+
+		vkUpdateDescriptorSets(m_Device, 1, &writeInfo, 0, nullptr);
+	}
+}
+
+void GraphicsEngine::createQueryDescriptorPool()
+{
+	std::array<VkDescriptorPoolSize, 1> poolSizes{};
+
+	poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+	poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+
+	VkDescriptorPoolCreateInfo createInfo{};
+	createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	createInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+	createInfo.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+	createInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
+	createInfo.pPoolSizes = poolSizes.data();
+
+	if (vkCreateDescriptorPool(m_Device, &createInfo, nullptr, &mQueryDescPool) != VK_SUCCESS)
+		throw std::runtime_error("Failed to create descriptor pool!");
+}
+
+void GraphicsEngine::createQueryDescriptorSetLayout()
+{
+	VkDescriptorSetLayoutBinding bindInfo{};
+	bindInfo.binding = 0;
+	bindInfo.descriptorCount = 1;
+	bindInfo.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	bindInfo.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+	VkDescriptorSetLayoutCreateInfo layoutInfo{};
+	layoutInfo.bindingCount = 1;
+	layoutInfo.pBindings = &bindInfo;
+	layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+
+	if (vkCreateDescriptorSetLayout(m_Device, &layoutInfo, nullptr, &mQueryDescLayout) != VK_SUCCESS)
+		throw std::runtime_error("Failed to create descriptor set layout");
+}
+
+void GraphicsEngine::createQueryPipeline()
+{
+	auto vertexCode = readFile("src/bin/overt.spv");
+	auto fragCode = readFile("src/bin/ofrag.spv");
+
+	VkShaderModule vertexModule = createShaderModule(vertexCode);
+	VkShaderModule fragmentModule = createShaderModule(fragCode);
+
+	VkPipelineShaderStageCreateInfo vertexStageInfo{};
+	vertexStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	vertexStageInfo.module = vertexModule;
+	vertexStageInfo.pName = "main";
+	vertexStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+
+	VkPipelineShaderStageCreateInfo fragStageInfo{};
+	fragStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	fragStageInfo.module = fragmentModule;
+	fragStageInfo.pName = "main";
+	fragStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+	std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages = { vertexStageInfo, fragStageInfo };
+
+	VkPipelineVertexInputStateCreateInfo vertexInput{};
+	vertexInput.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+
+	VkVertexInputBindingDescription binding{};
+	binding.binding = 0;
+	binding.stride = sizeof(glm::vec3);
+	binding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+	VkVertexInputAttributeDescription attribute{};
+	attribute.binding = 0;
+	attribute.location = 0;
+	attribute.offset = 0;
+	attribute.format = VK_FORMAT_R32G32B32_SFLOAT;
+
+	vertexInput.vertexAttributeDescriptionCount = 1;
+	vertexInput.pVertexAttributeDescriptions = &attribute;
+	vertexInput.vertexBindingDescriptionCount = 1;
+	vertexInput.pVertexBindingDescriptions = &binding;
+
+	VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
+	inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+	inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+	inputAssembly.primitiveRestartEnable = VK_FALSE;
+
+	VkPipelineViewportStateCreateInfo viewportInfo{};
+	viewportInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+	viewportInfo.scissorCount = 1;
+	viewportInfo.viewportCount = 1;
+
+	std::array<VkDynamicState, 2> dynamicStates = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+
+	VkPipelineDynamicStateCreateInfo dynamicCreateInfo{};
+	dynamicCreateInfo.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
+	dynamicCreateInfo.pDynamicStates = dynamicStates.data();
+
+	VkPipelineRasterizationStateCreateInfo rasterizer{};
+	rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+	rasterizer.depthClampEnable = VK_FALSE;
+	rasterizer.rasterizerDiscardEnable = VK_FALSE;
+	rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+	rasterizer.lineWidth = 1.0f;
+	rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+	rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+
+	VkPipelineMultisampleStateCreateInfo multisampling{};
+	multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+	multisampling.sampleShadingEnable = VK_FALSE;
+	multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+	VkPipelineDepthStencilStateCreateInfo depthStencil{};
+	depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+	depthStencil.depthTestEnable = VK_TRUE;
+	depthStencil.depthWriteEnable = VK_TRUE;
+	depthStencil.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+	depthStencil.depthBoundsTestEnable = VK_FALSE;
+	depthStencil.stencilTestEnable = VK_FALSE;
+
+	VkPipelineColorBlendStateCreateInfo colorBlendState{};
+	colorBlendState.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+	colorBlendState.logicOpEnable = VK_FALSE;
+	colorBlendState.attachmentCount = 0;
+
+	VkPushConstantRange pushRange{};
+	pushRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+	pushRange.offset = 0;
+	pushRange.size = sizeof(glm::mat4);
+
+	VkPipelineLayoutCreateInfo layoutCreateInfo{};
+	layoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+	layoutCreateInfo.setLayoutCount = 1;
+	layoutCreateInfo.pSetLayouts = &mQueryDescLayout;
+	layoutCreateInfo.pushConstantRangeCount = 1;
+	layoutCreateInfo.pPushConstantRanges = &pushRange;
+
+	vkCreatePipelineLayout(m_Device, &layoutCreateInfo, nullptr, &mQueryPipelineLayout);
+
+	VkGraphicsPipelineCreateInfo pipelineInfo{};
+	pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+	pipelineInfo.stageCount = static_cast<uint32_t>(shaderStages.size());
+	pipelineInfo.pStages = shaderStages.data();
+	pipelineInfo.pVertexInputState = &vertexInput;
+	pipelineInfo.pInputAssemblyState = &inputAssembly;
+	pipelineInfo.pViewportState = &viewportInfo;
+	pipelineInfo.pRasterizationState = &rasterizer;
+	pipelineInfo.pMultisampleState = &multisampling;
+	pipelineInfo.pDepthStencilState = &depthStencil;
+	pipelineInfo.pColorBlendState = &colorBlendState;
+	pipelineInfo.pDynamicState = &dynamicCreateInfo;
+	pipelineInfo.layout = mQueryPipelineLayout;
+	pipelineInfo.renderPass = mQueryRenderPass;
+	pipelineInfo.subpass = 0;
+
+	if (vkCreateGraphicsPipelines(m_Device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &mQueryPipeline) != VK_SUCCESS)
+		throw std::runtime_error("Failed to create occlusion query pipeline!");
+
+
+}
+
+void GraphicsEngine::performOcclusionQuery(VkCommandBuffer& commandBuffer, unsigned int chunkCount, std::unordered_map<glm::ivec2, Chunk>& chunkMap)
+{
+	vkCmdResetQueryPool(commandBuffer, mOcclusionQueryPool, 0, chunkCount);
+
+	uint32_t queryIndex = 0;
+
+	for (const auto& chunk : chunkMap)
+	{
+		vkCmdBeginQuery(commandBuffer, mOcclusionQueryPool, queryIndex, 0);
+
+		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mQueryPipeline);
+
+		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mQueryPipelineLayout, 0, 1, &mQueryDescriptorSets[currentFrame], 0, nullptr);
+
+		glm::mat4 modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(chunk.first.x * CHUNKSIZE, 0.0f, chunk.first.y * CHUNKSIZE));
+		vkCmdPushConstants(commandBuffer, mQueryPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &modelMatrix);
+	}
 	// for each chunk begin query, draw a bounding box (create aabb geometry beforehand), finish query
 	// in next frame get results
 	// then in the frame after that send results back to planet and cull

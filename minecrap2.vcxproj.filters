@@ -60,5 +60,7 @@
     <None Include="compile.bat">
       <Filter>Source Files</Filter>
     </None>
+    <None Include="src\shaderSource\occlusion.vert" />
+    <None Include="src\shaderSource\occlusion.frag" />
   </ItemGroup>
 </Project>
