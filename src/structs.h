@@ -40,6 +40,36 @@ struct Vertex
 	}
 };
 
+struct RPVertex
+{
+	RPVertex(float x, float y, float z)
+	{
+		xyz = glm::vec3(x, y, z);
+	}
+	glm::vec3 xyz;
+
+	static VkVertexInputBindingDescription getBindingDescription()
+	{
+		VkVertexInputBindingDescription binding{};
+		binding.binding = 0;
+		binding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+		binding.stride = sizeof(RPVertex);
+
+		return binding;
+	}
+
+	static VkVertexInputAttributeDescription getAttributeDescription()
+	{
+		VkVertexInputAttributeDescription attribute{};
+		attribute.binding = 0;
+		attribute.format = VK_FORMAT_R32G32B32_SFLOAT;
+		attribute.location = 0;
+		attribute.offset = offsetof(RPVertex, xyz);
+
+		return attribute;
+	}
+};
+
 struct MVP
 {
 	glm::mat4 view;

@@ -285,7 +285,7 @@ void Chunk::createGPUBuffers()
     }
 
     // Create new opaque buffers
-    GraphicsEngine::createVertexBuffer(mMeshVertices, mVertexBuffer, mVertexBufferMemory);
+    GraphicsEngine::createVertexBuffer<Vertex>(mMeshVertices, mVertexBuffer, mVertexBufferMemory);
     GraphicsEngine::createIndexBuffer(mMeshIndices, mIndexBuffer, mIndexBufferMemory);
 
     // Destroy old transparent buffers if they exist
@@ -306,7 +306,7 @@ void Chunk::createGPUBuffers()
         }
 
         // Create new transparent buffers
-        GraphicsEngine::createVertexBuffer(mTransparentMeshVertices, mTransparentVertexBuffer, mTransparentVertexBuffferMemory);
+        GraphicsEngine::createVertexBuffer<Vertex>(mTransparentMeshVertices, mTransparentVertexBuffer, mTransparentVertexBuffferMemory);
         GraphicsEngine::createIndexBuffer(mTransparentMeshIndices, mTransparentIndexBuffer, mTransparentIndexBufferMemory);
     }
 }
@@ -391,7 +391,7 @@ bool ChunkData::allocateChunkData(glm::ivec2 chunkCoords)
     static int octaves = 6;
     static float persistance = 0.48f;
 
-    static uint32_t seed = glfwGetTime() * 1000;
+    static uint32_t seed = static_cast<uint32_t>(glfwGetTime() * 1000);
 
     std::mutex airBlockMutex;
     unsigned maxThreads = std::max(1u, std::thread::hardware_concurrency());

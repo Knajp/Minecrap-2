@@ -68,9 +68,11 @@ void GraphicsEngine::IntializeGraphicsEngine()
 	createCommandBuffer();
 	createSyncObjects();
 	createQueryRenderPass();
+	createQueryDescriptorPool();
 	createQueryDescriptorSetLayout();
 	createQueryPipeline();
 	createQueryDescriptorSets();
+	createQueryResources();
 	createQueryFramebuffers();
 	createOcclusionQueryPool();
 	mainLoop();
@@ -257,6 +259,47 @@ void GraphicsEngine::pickPhysicalDevice()
 	else throw std::runtime_error("Failed to find a suitable GPU!");
 }
 
+void GraphicsEngine::createQueryResources()
+{
+	VkFormat depthFormat = findDepthFormat();
+	createImage(m_SwapchainExtent.height, m_SwapchainExtent.width, depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_SAMPLE_COUNT_1_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, mQueryImage, mQueryImageMemory);
+	mQueryImageView = createImageView(mQueryImage, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
+	static const std::vector<RPVertex> AABBVertices = {
+		{0.0f,				0.0f,				0.0f},
+		{1.0f * CHUNKSIZE,  0.0f,				0.0f},
+		{0.0f,			   -1.0f * CHUNKHEIGHT, 0.0f},
+		{1.0f * CHUNKSIZE, -1.0f * CHUNKHEIGHT, 0.0f},
+		{0.0f,				0.0f,				1.0f * CHUNKSIZE},
+		{1.0f * CHUNKSIZE,  0.0f,				1.0f * CHUNKSIZE},
+		{0.0f,			   -1.0f * CHUNKHEIGHT, 1.0f * CHUNKSIZE},
+		{1.0f * CHUNKSIZE, -1.0f * CHUNKHEIGHT, 1.0f * CHUNKSIZE},
+	};
+
+	static const std::vector<uint16_t> AABBIndices = {
+		0, 1, 2,
+		2, 3, 1,
+
+		1, 3, 5,
+		5, 3, 7,
+
+		4, 5, 6,
+		6, 7, 5,
+
+		4, 0, 6,
+		0, 6, 2,
+
+		4, 5, 0,
+		0, 5, 1,
+
+		6, 7, 2,
+		2, 7, 3
+
+	};
+
+	createVertexBuffer<RPVertex>(AABBVertices, mQueryVertexBuffer, mQueryVertexBufferMemory);
+	createIndexBuffer(AABBIndices, mQueryIndexBuffer, mQueryIndexBufferMemory);
+}
+
 void GraphicsEngine::createOcclusionQueryPool()
 {
 	VkQueryPoolCreateInfo createInfo{};
@@ -276,8 +319,10 @@ void GraphicsEngine::createQueryFramebuffers()
 	{
 		VkImageView attachments[] =
 		{
-			depthImageView
+			mQueryImageView
 		};
+
+		
 
 		VkFramebufferCreateInfo createInfo{};
 		createInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
@@ -362,7 +407,7 @@ void GraphicsEngine::createQueryDescriptorSets()
 		imageInfo.imageView = textureImageView;
 		imageInfo.sampler = textureSampler;
 
-		VkWriteDescriptorSet writeInfo;
+		VkWriteDescriptorSet writeInfo{};
 
 		writeInfo.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 		writeInfo.dstSet = mQueryDescriptorSets[i];
@@ -465,6 +510,7 @@ void GraphicsEngine::createQueryPipeline()
 	std::array<VkDynamicState, 2> dynamicStates = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
 
 	VkPipelineDynamicStateCreateInfo dynamicCreateInfo{};
+	dynamicCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
 	dynamicCreateInfo.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
 	dynamicCreateInfo.pDynamicStates = dynamicStates.data();
 
@@ -528,11 +574,14 @@ void GraphicsEngine::createQueryPipeline()
 	if (vkCreateGraphicsPipelines(m_Device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &mQueryPipeline) != VK_SUCCESS)
 		throw std::runtime_error("Failed to create occlusion query pipeline!");
 
+	vkDestroyShaderModule(m_Device, vertexModule, nullptr);
+	vkDestroyShaderModule(m_Device, fragmentModule, nullptr);
 
 }
 
 void GraphicsEngine::performOcclusionQuery(VkCommandBuffer& commandBuffer, unsigned int chunkCount, std::unordered_map<glm::ivec2, Chunk>& chunkMap)
 {
+	
 	vkCmdResetQueryPool(commandBuffer, mOcclusionQueryPool, 0, chunkCount);
 
 	uint32_t queryIndex = 0;
@@ -547,16 +596,23 @@ void GraphicsEngine::performOcclusionQuery(VkCommandBuffer& commandBuffer, unsig
 
 		glm::mat4 modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(chunk.first.x * CHUNKSIZE, 0.0f, chunk.first.y * CHUNKSIZE));
 		vkCmdPushConstants(commandBuffer, mQueryPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &modelMatrix);
+
+		VkDeviceSize offsets = { 0 };
+		vkCmdBindVertexBuffers(commandBuffer, 0, 1, &mQueryVertexBuffer, &offsets);
+
+		vkCmdBindIndexBuffer(commandBuffer, mQueryIndexBuffer, 0, VK_INDEX_TYPE_UINT16);
+
+		vkCmdDrawIndexed(commandBuffer, 36, 1, 0, 0, 0);
+
+		vkCmdEndQuery(commandBuffer, mOcclusionQueryPool, queryIndex);
+
+		++queryIndex;
 	}
-	// for each chunk begin query, draw a bounding box (create aabb geometry beforehand), finish query
-	// in next frame get results
-	// then in the frame after that send results back to planet and cull
 }
 
 int GraphicsEngine::rateDeviceSuitability(const VkPhysicalDevice& device)
 {
 	int score = 0;
-
 	VkPhysicalDeviceProperties properties{};
 	vkGetPhysicalDeviceProperties(device, &properties);
 
@@ -649,6 +705,18 @@ void GraphicsEngine::terminate()
 {
 	mPlanet.prepareForDestruction();
 	mPlanet.Cleanup(2, m_Device);
+	vkFreeMemory(m_Device, mQueryImageMemory, nullptr);
+	vkDestroyImageView(m_Device, mQueryImageView, nullptr);
+	vkDestroyImage(m_Device, mQueryImage, nullptr);
+	for (auto& framebuffer : mQueryFramebuffers)
+		vkDestroyFramebuffer(m_Device, framebuffer, nullptr);
+	vkDestroyRenderPass(m_Device, mQueryRenderPass, nullptr);
+	vkFreeDescriptorSets(m_Device, mQueryDescPool, static_cast<uint32_t>(mQueryDescriptorSets.size()), mQueryDescriptorSets.data());
+	vkDestroyDescriptorPool(m_Device, mQueryDescPool, nullptr);
+	vkDestroyDescriptorSetLayout(m_Device, mQueryDescLayout, nullptr);
+	vkDestroyPipeline(m_Device, mQueryPipeline, nullptr);
+	vkDestroyPipelineLayout(m_Device, mQueryPipelineLayout, nullptr);
+	vkDestroyQueryPool(m_Device, mOcclusionQueryPool, nullptr);
 	vkFreeMemory(m_Device, colorImageMemory, nullptr);
 	vkDestroyImageView(m_Device, colorImageView, nullptr);
 	vkDestroyImage(m_Device, colorImage, nullptr);
@@ -1372,9 +1440,10 @@ void GraphicsEngine::createIndexBuffer(const std::vector<uint16_t>& indices, VkB
 	vkDestroyBuffer(m_Device, stagingBuffer, nullptr);
 }
 
-void GraphicsEngine::createVertexBuffer(const std::vector<Vertex>& vertices, VkBuffer& buffer, VkDeviceMemory& bufferMemory)
+template <typename T>
+void GraphicsEngine::createVertexBuffer(const std::vector<T>& vertices, VkBuffer& buffer, VkDeviceMemory& bufferMemory)
 {
-	VkDeviceSize bufferSize = sizeof(Vertex) * vertices.size();
+	VkDeviceSize bufferSize = sizeof(T) * vertices.size();
 
 	VkBuffer stagingBuffer;
 	VkDeviceMemory stagingBufferMemory;

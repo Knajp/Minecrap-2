@@ -54,11 +54,13 @@ public:
 
 	
 	static void createIndexBuffer(const std::vector<uint16_t>& indices, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
-	static void createVertexBuffer(const std::vector<Vertex>& vertices, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
+	template <typename T>
+	static void createVertexBuffer(const std::vector<T>& vertices, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
 	static VkDevice getDevice();
 private:
 	GraphicsEngine() = default;
 	
+	void createQueryResources();
 	void createOcclusionQueryPool();
 	void createQueryFramebuffers();
 	void createQueryRenderPass();
@@ -192,6 +194,16 @@ private:
 
 	VkRenderPass mQueryRenderPass;
 	std::vector<VkFramebuffer> mQueryFramebuffers;
+
+	VkImage mQueryImage;
+	VkDeviceMemory mQueryImageMemory;
+	VkImageView mQueryImageView;
+
+	VkBuffer mQueryVertexBuffer;
+	VkDeviceMemory mQueryVertexBufferMemory;
+
+	VkBuffer mQueryIndexBuffer;
+	VkDeviceMemory mQueryIndexBufferMemory;
 };
 
 static void framebufferResizeCallback(GLFWwindow* window, int width, int height)

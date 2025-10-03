@@ -205,9 +205,13 @@ public:
 	void fillMissingBlocks();
 
 	static const uint8_t renderDistance = 4;
+
+	
+
 private:
 	std::unordered_map<glm::ivec2, Chunk> mChunks; 
 	std::array<ChunkFreeList, MAX_FRAMES_IN_FLIGHT> mAwaitngDestruction;
+	
 	
 	
 };
