@@ -285,7 +285,7 @@ void Chunk::createGPUBuffers()
     }
 
     // Create new opaque buffers
-    GraphicsEngine::createVertexBuffer<Vertex>(mMeshVertices, mVertexBuffer, mVertexBufferMemory);
+    GraphicsEngine::createVertexBuffer(mMeshVertices, mVertexBuffer, mVertexBufferMemory);
     GraphicsEngine::createIndexBuffer(mMeshIndices, mIndexBuffer, mIndexBufferMemory);
 
     // Destroy old transparent buffers if they exist
@@ -306,7 +306,7 @@ void Chunk::createGPUBuffers()
         }
 
         // Create new transparent buffers
-        GraphicsEngine::createVertexBuffer<Vertex>(mTransparentMeshVertices, mTransparentVertexBuffer, mTransparentVertexBuffferMemory);
+        GraphicsEngine::createVertexBuffer(mTransparentMeshVertices, mTransparentVertexBuffer, mTransparentVertexBuffferMemory);
         GraphicsEngine::createIndexBuffer(mTransparentMeshIndices, mTransparentIndexBuffer, mTransparentIndexBufferMemory);
     }
 }

@@ -296,7 +296,7 @@ void GraphicsEngine::createQueryResources()
 
 	};
 
-	createVertexBuffer<RPVertex>(AABBVertices, mQueryVertexBuffer, mQueryVertexBufferMemory);
+	createVertexBuffer(AABBVertices, mQueryVertexBuffer, mQueryVertexBufferMemory);
 	createIndexBuffer(AABBIndices, mQueryIndexBuffer, mQueryIndexBufferMemory);
 }
 
@@ -1440,10 +1440,29 @@ void GraphicsEngine::createIndexBuffer(const std::vector<uint16_t>& indices, VkB
 	vkDestroyBuffer(m_Device, stagingBuffer, nullptr);
 }
 
-template <typename T>
-void GraphicsEngine::createVertexBuffer(const std::vector<T>& vertices, VkBuffer& buffer, VkDeviceMemory& bufferMemory)
+void GraphicsEngine::createVertexBuffer(const std::vector<Vertex>& vertices, VkBuffer& buffer, VkDeviceMemory& bufferMemory)
 {
-	VkDeviceSize bufferSize = sizeof(T) * vertices.size();
+	VkDeviceSize bufferSize = sizeof(Vertex) * vertices.size();
+
+	VkBuffer stagingBuffer;
+	VkDeviceMemory stagingBufferMemory;
+	createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+
+	void* data;
+	vkMapMemory(m_Device, stagingBufferMemory, 0, bufferSize, 0, &data);
+	memcpy(data, vertices.data(), bufferSize);
+	vkUnmapMemory(m_Device, stagingBufferMemory);
+
+	createBuffer(bufferSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, buffer, bufferMemory);
+	copyBuffer(stagingBuffer, buffer, bufferSize);
+
+	vkFreeMemory(m_Device, stagingBufferMemory, nullptr);
+	vkDestroyBuffer(m_Device, stagingBuffer, nullptr);
+}
+
+void GraphicsEngine::createVertexBuffer(const std::vector<RPVertex>& vertices, VkBuffer& buffer, VkDeviceMemory& bufferMemory)
+{
+	VkDeviceSize bufferSize = sizeof(RPVertex) * vertices.size();
 
 	VkBuffer stagingBuffer;
 	VkDeviceMemory stagingBufferMemory;
